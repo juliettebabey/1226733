@@ -102,7 +102,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   <section id="card" aria-label="Model controls">
     <header>
       <h1>Glass barn house</h1>
-      <p class="sub">Layout sketch v20. One grid square is 1 m.</p>
+      <p class="sub">Layout sketch v21. One grid square is 1 m.</p>
     </header>
 
     <div>
@@ -218,7 +218,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   var scene = new THREE.Scene();
   scene.fog = new THREE.Fog(PAPER, 80, 210);
 
-  var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 400);
+  var camera = new THREE.PerspectiveCamera(40, 1, 0.6, 400);   // near plane is pulled in only while walking, for crisper depth from afar
   var controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
@@ -228,14 +228,14 @@ body.walking.dragging #stage canvas{cursor:grabbing}
 
   scene.add(new THREE.HemisphereLight(0xffffff, 0xb6ae9f, 0.68));
   var sun = new THREE.DirectionalLight(0xfff4e2, 0.52);
-  sun.position.set(L / 2 + 12, 30, W / 2 + 34);   // from the south-west: afternoon sun on the glass side
-  sun.target.position.set(L / 2, 0, W / 2);
+  sun.position.set(L / 2 + 20, 34, W / 2 + 38);   // from the south-west: afternoon sun on the glass side
+  sun.target.position.set(L / 2 + 8, 0, W / 2);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -36; sun.shadow.camera.right = 36;
-  sun.shadow.camera.top = 36; sun.shadow.camera.bottom = -36;
-  sun.shadow.camera.near = 1; sun.shadow.camera.far = 110;
-  sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.04;
+  sun.shadow.mapSize.set(3072, 3072);
+  sun.shadow.camera.left = -48; sun.shadow.camera.right = 48;
+  sun.shadow.camera.top = 48; sun.shadow.camera.bottom = -48;
+  sun.shadow.camera.near = 1; sun.shadow.camera.far = 140;
+  sun.shadow.bias = -0.0012; sun.shadow.normalBias = 0.09;
   scene.add(sun); scene.add(sun.target);
 
   /* ---------- hand-drawn textures, one tile = 1 m (ground tile = 5 m) ---------- */
@@ -347,6 +347,8 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     mown: flat(0xbccf96),
     paving: flat(0xd8d2c4),
     grass: flat(0xcfdcb8),
+    lavender: flat(0x9a86c4),
+    logs: flat(0x9b7650),
     steel: flat(0x6f757c),
     woodDk: flat(0xa88255),
     woodLt: flat(0xd3b181),
@@ -941,18 +943,18 @@ body.walking.dragging #stage canvas{cursor:grabbing}
       tuft.position.set(gx, GY + gh / 2, gz); tuft.castShadow = true; G.add(tuft);
     }
     // meadow with a mown path out to the sauna
-    box(G, -12, 44, GY, GY + 0.012, SZ + TD + 0.5, SZ + 31, MAT.meadow, { cast: false, edges: false });
+    box(G, -12, 62.5, GY, GY + 0.02, SZ + TD + 0.5, SZ + 31, MAT.meadow, { cast: false, edges: false });
     var pth = [], P0 = [4, SZ + TD], P1 = [4.5, SZ + 14], P2 = [10.4, SZ + 19];
     for (var pt = 0; pt <= 14; pt++) { var t = pt / 14, u = 1 - t; pth.push([u * u * P0[0] + 2 * u * t * P1[0] + t * t * P2[0], u * u * P0[1] + 2 * u * t * P1[1] + t * t * P2[1]]); }
     for (pt = 0; pt < pth.length - 1; pt++) {
       var a0 = pth[pt], a1 = pth[pt + 1], sdx = a1[0] - a0[0], sdz = a1[1] - a0[1], sl = Math.sqrt(sdx * sdx + sdz * sdz);
       var seg = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.016, sl + 0.05), MAT.mown);
-      seg.position.set((a0[0] + a1[0]) / 2, GY + 0.02, (a0[1] + a1[1]) / 2); seg.rotation.y = Math.atan2(sdx, sdz); seg.receiveShadow = true; G.add(seg);
+      seg.position.set((a0[0] + a1[0]) / 2, GY + 0.035, (a0[1] + a1[1]) / 2); seg.rotation.y = Math.atan2(sdx, sdz); seg.receiveShadow = true; G.add(seg);
     }
     var flowers = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), new THREE.MeshLambertMaterial(), 520), fm = new THREE.Object3D(), fc = new THREE.Color();
     var fcols = [0xffffff, 0xffffff, 0xf2dc7a, 0xf2dc7a, 0xb79ad8, 0xe7928a], fn = 0;
     while (fn < 520) {
-      var fx = -11 + srnd() * 54, fz = SZ + TD + 1 + srnd() * 29;
+      var fx = -11 + srnd() * 72, fz = SZ + TD + 1 + srnd() * 29;
       if (fx > 9.5 && fx < 19.5 && fz > SZ + 13 && fz < SZ + 22) continue;            // keep the sauna deck clear
       fm.position.set(fx, GY + 0.05 + srnd() * 0.15, fz); fm.updateMatrix(); flowers.setMatrixAt(fn, fm.matrix);
       flowers.setColorAt(fn, fc.setHex(fcols[Math.floor(srnd() * fcols.length)])); fn++;
@@ -986,10 +988,67 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     box(G, SX0 - 0.2, SX0 + 0.8, GY + 1.25, GY + 1.27, SZ1 + 2.7, SZ1 + 3.7, MAT.pool, { edges: false });
     // windbreak along the far boundary: hedge with trees, kept low across the view from the glass hall
     var HZ = SZ + 32.5;
-    [[-12, -3, 2.6], [-3, 13, 1.1], [13, 44, 2.6]].forEach(function (h) { box(G, h[0], h[1], GY, GY + h[2], HZ - 0.8, HZ + 0.8, MAT.leafDk, { edges: false }); });
-    [-10, -5, 16, 22, 28, 34, 40].forEach(function (tx, ti) {
+    [[-12, -3, 2.6], [-3, 13, 1.1], [13, 62.5, 2.6]].forEach(function (h) { box(G, h[0], h[1], GY, GY + h[2], HZ - 0.8, HZ + 0.8, MAT.leafDk, { edges: false }); });
+    [-10, -5, 16, 22, 28, 34, 40, 46, 52, 58].forEach(function (tx, ti) {
       cyl(G, tx, GY, GY + 3.2, HZ + 0.2, 0.2, 0.14, MAT.trunk, 8); sphere(G, tx, GY + 5.0 + (ti % 2) * 0.8, HZ + 0.2, 2.3 + (ti % 3) * 0.3, ti % 2 ? MAT.leaf : MAT.leafDk, 1.15);
     });
+
+    /* --- south side: the arrival --- */
+    var SB = 62.5, DZ0 = -6.2, DZ1 = -2.6, DX0 = L + 9;                    // plot boundary, drive edges, where the drive leaves the forecourt
+    // lawn between the forecourt and the boundary
+    box(G, L + 9, SB, GY, GY + 0.02, -26, SZ + TD + 0.5, MAT.grass, { cast: false, edges: false });
+    box(G, L, L + 9, GY, GY + 0.02, SZ, SZ + TD + 0.5, MAT.grass, { cast: false, edges: false });
+    // tree-lined drive (linden avenue, the old Polish country lane) to a timber gate
+    box(G, DX0 - 0.2, SB, GY, GY + 0.045, DZ0, DZ1, MAT.gravel, { cast: false, edges: false });
+    for (var av = DX0 + 2.5; av < SB - 2; av += 6) [DZ0 - 1.4, DZ1 + 1.4].forEach(function (az) {
+      cyl(G, av, GY, GY + 2.6, az, 0.17, 0.13, MAT.trunk, 8);
+      sphere(G, av, GY + 4.3, az, 1.9, MAT.leaf, 1.25);
+    });
+    [DZ0 - 0.3, DZ1 + 0.3].forEach(function (gz) { box(G, SB - 0.15, SB + 0.15, GY, GY + 1.6, gz - 0.15, gz + 0.15, MAT.woodDk); });
+    box(G, SB - 0.05, SB + 0.05, GY + 0.15, GY + 1.3, DZ0, (DZ0 + DZ1) / 2 - 0.02, MAT.woodLt);       // gate leaves
+    box(G, SB - 0.05, SB + 0.05, GY + 0.15, GY + 1.3, (DZ0 + DZ1) / 2 + 0.02, DZ1, MAT.woodLt);
+    box(G, SB - 0.6, SB - 0.3, GY, GY + 1.1, DZ1 + 0.8, DZ1 + 1.2, MAT.woodDk);                         // post box
+    // boundary hedge on the south edge, open for the gate
+    [[-26, DZ0 - 0.6], [DZ1 + 0.6, SZ + 33.3]].forEach(function (h) { box(G, SB, SB + 1.4, GY, GY + 2.2, h[0], h[1], MAT.leafDk, { edges: false }); });
+    // guest parking on the forecourt and an EV charger by the garage door
+    [-19.4, -16.9].forEach(function (pz) { box(G, L + 3.5, L + 8.6, GY + 0.04, GY + 0.05, pz, pz + 0.06, MAT.white, { cast: false, edges: false }); });
+    box(G, L + 3.5, L + 3.56, GY + 0.04, GY + 0.05, -19.4, -14.4, MAT.white, { cast: false, edges: false });
+    box(G, L + 0.15, L + 0.4, GY, GY + 1.4, -6.95, -6.65, MAT.dark);
+    box(G, L + 0.38, L + 0.42, GY + 0.9, GY + 1.25, -6.92, -6.68, MAT.ink, { edges: false, cast: false });
+    // front door: stone slab path between lavender beds, bench beside the door
+    var DC = W / 2 + 1.5;                                                   // centre line of the front door
+    for (var sl = 0; sl < 6; sl++) box(G, L + 0.3 + sl * 1.15, L + 1.25 + sl * 1.15, GY + 0.04, GY + 0.08, DC - 0.75, DC + 0.75, MAT.stone, { cast: false });
+    [[DC - 2.8, DC - 0.95], [DC + 0.95, DC + 2.6]].forEach(function (bd) {
+      box(G, L + 0.3, L + 7.2, GY, GY + 0.06, bd[0], bd[1], MAT.trunk, { cast: false, edges: false });
+      for (var lv = 0; lv < 12; lv++) sphere(G, L + 0.7 + (lv % 6) * 1.15, GY + 0.3, bd[0] + 0.45 + Math.floor(lv / 6) * (bd[1] - bd[0] - 0.9), 0.36, MAT.lavender, 0.8);
+    });
+    box(G, L + 0.1, L + 0.55, GY, GY + 0.45, SZ - 1.6, SZ - 0.2, MAT.woodLt);                            // bench
+    // big linden by the entrance corner, shading the front gable in summer
+    cyl(G, L + 6.5, GY, GY + 3.4, SZ + 5.5, 0.32, 0.24, MAT.trunk, 10);
+    sphere(G, L + 6.5, GY + 6.6, SZ + 5.5, 3.6, MAT.leaf, 1.05); sphere(G, L + 5.0, GY + 5.4, SZ + 6.6, 2.4, MAT.leaf, 1); sphere(G, L + 8.0, GY + 5.6, SZ + 4.5, 2.3, MAT.leafDk, 1);
+    // firewood store against the gym wall (fireplace, sauna, fire pit), bin store and heat-pump screen by the garage
+    box(G, L + 0.05, L + 1.1, GY, GY + 2.0, -19.6, -14.6, MAT.woodDk);
+    box(G, L + 0.05, L + 1.25, GY + 2.0, GY + 2.12, -19.8, -14.4, MAT.roofdk === undefined ? MAT.dark : MAT.dark);
+    for (var lg = 0; lg < 4; lg++) box(G, L + 0.12, L + 1.08, GY + 0.1 + lg * 0.45, GY + 0.5 + lg * 0.45, -19.5, -14.7, MAT.logs, { edges: false });
+    box(G, L + 0.05, L + 1.3, GY, GY + 1.35, -5.6, -3.6, MAT.woodLt);
+    for (var sc = 0; sc < 9; sc++) box(G, L + 0.95 + sc * 0.08, L + 0.99 + sc * 0.08, GY, GY + 1.2, -3.15, -3.11, MAT.woodLt, { edges: false });
+    box(G, L + 0.95, L + 1.0, GY, GY + 1.2, -3.15, -1.15, MAT.woodLt);
+    // kitchen garden in the sunny corner: raised beds and a greenhouse
+    box(G, 41, 54, GY, GY + 0.04, 1.0, 12.0, MAT.gravel, { cast: false, edges: false });
+    for (var rb = 0; rb < 6; rb++) {
+      var rbx = 41.8 + (rb % 3) * 2.4, rbz = 2.0 + Math.floor(rb / 3) * 4.3;
+      box(G, rbx, rbx + 1.3, GY, GY + 0.45, rbz, rbz + 3.2, MAT.woodLt);
+      box(G, rbx + 0.06, rbx + 1.24, GY + 0.45, GY + 0.47, rbz + 0.06, rbz + 3.14, MAT.trunk, { edges: false, cast: false });
+      for (var vg = 0; vg < 4; vg++) sphere(G, rbx + 0.65, GY + 0.62, rbz + 0.45 + vg * 0.75, 0.22, rb % 2 ? MAT.leaf : MAT.leafDk, 0.8);
+    }
+    var GH0 = 49.2, GH1 = 53.4, GHZ0 = 3.0, GHZ1 = 6.6, GHE = 2.1, GHR = 3.2;   // greenhouse, gable roof
+    box(G, GH0, GH1, GY, GY + 0.3, GHZ0, GHZ1, texBox('brick', GH1 - GH0, 0.3, GHZ1 - GHZ0));
+    box(G, GH0, GH1, GY + 0.3, GY + GHE, GHZ0, GHZ1, MAT.glass);
+    [GH0, (GH0 + GH1) / 2, GH1].forEach(function (gx) { [GHZ0, GHZ1].forEach(function (gz) { box(G, gx - 0.05, gx + 0.05, GY + 0.3, GY + GHE, gz - 0.05, gz + 0.05, MAT.white, { edges: false }); }); });
+    var ghs = new THREE.Shape(); ghs.moveTo(GHZ0, GHE); ghs.lineTo(GHZ1, GHE); ghs.lineTo((GHZ0 + GHZ1) / 2, GHR); ghs.lineTo(GHZ0, GHE);
+    var ghr = new THREE.Mesh(new THREE.ExtrudeGeometry(ghs, { depth: GH1 - GH0, bevelEnabled: false }), MAT.glass);
+    ghr.rotation.y = -Math.PI / 2; ghr.position.set(GH1, GY, 0); G.add(ghr);
+    box(G, GH0 - 0.05, GH1 + 0.05, GY + GHR - 0.06, GY + GHR + 0.02, (GHZ0 + GHZ1) / 2 - 0.05, (GHZ0 + GHZ1) / 2 + 0.05, MAT.white, { edges: false });
 
     /* --- king bed upstairs --- */
     var BX1 = L - WT - 0.02, BZ = W / 2;                       // head of the bed against the front wall
@@ -1024,6 +1083,11 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     tag('Guest room', 27 + o, B + 1.2, W - 2.9, 'zone'); tag('Bathroom', 26 + o, B + 1.2, 2.0, 'zone');
     tag('Wardrobe + storage', 30.3 + o, B + 1.2, 1.3, 'zone'); tag('Entrance hall', 32.1 + o, B + 1.2, W / 2 + 1.5, 'zone');
     tag('Main entrance', L + 0.5, B + 3.1, W / 2 + 1.5);
+    tag('Lavender path', L + 4, B + 0.9, W / 2 + 1.5); tag('Linden', L + 6.5, B + 10.6, W + 5.5);
+    tag('Tree-lined drive', 50, B + 0.6, -4.4); tag('Gate', 62.5, B + 2.1, -4.4);
+    tag('Guest parking', L + 6, B + 0.6, -17.2); tag('EV charger', L + 0.6, B + 1.8, -6.8);
+    tag('Firewood store', L + 0.6, B + 2.6, -17.1); tag('Bins', L + 0.7, B + 1.7, -4.6);
+    tag('Kitchen garden', 45.4, B + 1.1, 7.2); tag('Greenhouse', 51.3, B + 3.7, 4.8);
     tag('Garage door', WX1 + 0.5, B + 2.9, -10.2);
     tag('2 cars', 31 + o, B + 1.9, -10.3); tag('Workbench', 25.4 + o, B + 1.5, -11);
     tag('Dirt bikes + bikes', 26 + o, B + 1.6, -4.4); tag('Ski gear', 26, B + 2.5, UZ - 0.4);
@@ -1152,12 +1216,13 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     walk.x = 2.6; walk.z = W + 2.6;                       // on the sunset terrace, facing the glass corner
     var f = floorAt(walk.x, walk.z, 2.5); walk.feet = f === null ? 0 : f;
     walk.yaw = Math.atan2(-0.42, 0.9); walk.pitch = 0.06;
-    camera.fov = 72; camera.updateProjectionMatrix();
+    camera.fov = 72; camera.near = 0.08; camera.updateProjectionMatrix();
     hud.hidden = false; document.body.classList.add('walking'); lamp.visible = true;
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   }
   function exitWalk() {
     walk.on = false; walk.keys = {}; walk.target = null; marker.visible = false;
+    camera.near = 0.6; camera.updateProjectionMatrix();
     controls.enabled = true; hud.hidden = true; lamp.visible = false; document.body.classList.remove('walking', 'dragging', 'locked');
     if (locked() && document.exitPointerLock) document.exitPointerLock();
     aimNote.classList.remove('show');
@@ -1244,12 +1309,12 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     var B = BASE, g = geo, mid = g.Hr * 0.4;
     switch (name) {
       case 'layout':  return { pos: [-12, 42, 37], tgt: [13.5, 1, -1], roof: false, xray: true, fit: true };
-      case 'plan':    return { pos: [L / 2 + 1, 118, 7.3], tgt: [L / 2 + 1, 0, 6.6], roof: false, xray: false, fit: true };
+      case 'plan':    return { pos: [25, 138, 8.7], tgt: [25, 0, 8], roof: false, xray: false, fit: true };
       case 'sofa':    return { pos: [6.9, B + 1.15, W / 2], tgt: [3.2, B + 3.0, W / 2 + 2.2], roof: true, xray: false, fov: 72 };
       case 'balcony': return { pos: [12.3, B + g.h2 + 1.62, g.zb + 0.4], tgt: [6, B + 2.2, W / 2], roof: true, xray: false, fov: 66 };
       case 'terrace': return { pos: [-19, 18, -50], tgt: [16, 2.5, -5], roof: true, xray: false, fit: true };
       case 'sunset':  return { pos: [L / 2 + 6, 30, W + 44], tgt: [L / 2 - 2, 0, W + 7], roof: true, xray: false, fit: true };
-      case 'entrance': return { pos: [L + 31, 14, -32], tgt: [L - 7, 2, -5], roof: true, xray: false, fit: true };
+      case 'entrance': return { pos: [L + 24, 24, -40], tgt: [L + 3, 1, -4], roof: true, xray: false, fit: true };
       default:        return { pos: [-22, g.Hr + 10, 33], tgt: [9, 2.5, 3], roof: true, xray: false, fit: true };
     }
   }

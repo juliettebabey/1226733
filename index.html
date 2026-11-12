@@ -102,7 +102,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   <section id="card" aria-label="Model controls">
     <header>
       <h1>Glass barn house</h1>
-      <p class="sub">Layout sketch v19. One grid square is 1 m.</p>
+      <p class="sub">Layout sketch v20. One grid square is 1 m.</p>
     </header>
 
     <div>
@@ -115,6 +115,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
         <button class="view" type="button" data-view="balcony" aria-pressed="false">From the balcony</button>
         <button class="view" type="button" data-view="terrace" aria-pressed="false">Terrace side</button>
         <button class="view" type="button" data-view="entrance" aria-pressed="false">Entrance side</button>
+        <button class="view" type="button" data-view="sunset" aria-pressed="false">Sunset side</button>
         <button class="view walk" type="button" data-view="walk" aria-pressed="false">Walk around</button>
       </div>
     </div>
@@ -337,6 +338,13 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     gravel: flat(0xdedad0),
     rubber: flat(0x3b3e42),
     pool: flat(0x7fc4d4),
+    leaf: flat(0x88a35f),
+    leafDk: flat(0x6b8749),
+    bark: flat(0xeeebe4),
+    trunk: flat(0x7a6048),
+    grassGold: flat(0xcdb57a),
+    meadow: flat(0xdbe1bd),
+    mown: flat(0xbccf96),
     paving: flat(0xd8d2c4),
     grass: flat(0xcfdcb8),
     steel: flat(0x6f757c),
@@ -494,7 +502,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     var i, r, xp, px;
     box(G, 0, L, -BASE - 0.05, 0, 0, W, [MAT.slab, MAT.slab, M('floor', L, W), MAT.slab, MAT.slab, MAT.slab], { cast: false });
     // terrace: along the garden side up to the wing, round the TV gable, and along the glass for the sunset
-    var strips = [[-TD, WX0, -TD, 0], [-TD, 0, 0, W + TD], [0, GL, W, W + TD]];
+    var strips = [[-TD, WX0, -TD, 0], [-TD, 0, 0, W + TD], [0, 19.6, W, W + TD]];
     strips.forEach(function (q) {
       box(G, q[0], q[1], -BASE, -0.03, q[2], q[3], [MAT.woodDk, MAT.woodDk, M('deck', q[1] - q[0], q[3] - q[2]), MAT.woodDk, MAT.woodDk, MAT.woodDk], { cast: false });
     });
@@ -562,8 +570,17 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     }
     var UWH = Math.min(h2 + 2.7, He - 0.1), GWH = Math.min(2.6, h2 - 0.35);     // window heads upstairs / downstairs
     var WR0 = 15.6, WR1 = 19.2, WB0 = WX0 + 1.0, WB1 = WX0 + 6.0;              // west room; bedroom above the guest room
-    westSeg(GL, WR0, -BASE, He);
-    westSeg(WR0, WR1, -BASE, h2); westGlass(WR0, WR1, h2, UWH, 2); westSeg(WR0, WR1, UWH, He);
+    var KW0 = 15.4, KW1 = 19.0, KWS = 1.05, KWH = 2.3, kb = (KW1 - KW0) / 3;   // kitchen window: three bays over the counter
+    westSeg(GL, KW0, -BASE, He);
+    westSeg(KW0, KW1, -BASE, KWS); westSeg(KW0, KW1, KWH, h2); westSeg(KW1, WR1, -BASE, h2);
+    [KW0, KW0 + 2 * kb].forEach(function (bx) { box(G, bx, bx + kb, KWS, KWH, W - 0.17, W - 0.13, MAT.glass); });
+    for (var kq = 0; kq <= 3; kq++) { var kx = KW0 + kq * kb; box(G, kx - 0.06, kx + 0.06, KWS, KWH, W - 0.26, W - 0.04, MAT.frame); }
+    box(G, KW0, KW1, KWH - 0.08, KWH, W - 0.26, W - 0.04, MAT.frame, { edges: false });
+    box(G, KW0, KW1, KWS, KWS + 0.06, W - WT, W + 0.06, MAT.stone, { edges: false });            // deep sill doubles as the pass-through
+    var hatch = new THREE.Group(); hatch.position.set(KW0 + 1.5 * kb, KWH, W - 0.1); hatch.rotation.x = -1.15; G.add(hatch);
+    box(hatch, -kb / 2 + 0.04, kb / 2 - 0.04, -(KWH - KWS) + 0.06, 0, -0.02, 0.02, MAT.glass);
+    box(hatch, -kb / 2 + 0.04, kb / 2 - 0.04, -(KWH - KWS) + 0.06, -(KWH - KWS) + 0.14, -0.05, 0.05, MAT.frame, { edges: false });
+    westSeg(KW0, WR0, h2, He); westGlass(WR0, WR1, h2, UWH, 2); westSeg(WR0, WR1, UWH, He);
     var UB0 = WX0 + 4.3, UB1 = WX0 + 8.1;                                      // bedroom window upstairs, clear of the en-suite
     westSeg(WR1, WB0, -BASE, h2); westGlass(WB0, WB1, 0, GWH, 3); westSeg(WB0, WB1, GWH, h2); westSeg(WB1, L, -BASE, h2);
     westSeg(WR1, UB0, h2, He); westGlass(UB0, UB1, h2, UWH, 3); westSeg(UB0, UB1, UWH, He); westSeg(UB1, L, h2, He);
@@ -890,6 +907,90 @@ body.walking.dragging #stage canvas{cursor:grabbing}
       box(seat, -0.85, 0.85, GY + 0.42, GY + 0.85, -0.42, -0.3, MAT.woodLt, { edges: false });
     }
 
+    /* --- sunset side --- */
+    var SZ = W;                                                          // outer face of the sunset wall
+    function sphere(par, x, y, z, r, mat, sy) {
+      var m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), mat);
+      m.position.set(x, y, z); if (sy) m.scale.y = sy; m.castShadow = true; m.receiveShadow = true; par.add(m); return m;
+    }
+    function cyl(par, x, y0, y1, z, r0, r1, mat, seg) {
+      var m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, y1 - y0, seg || 12), mat);
+      m.position.set(x, (y0 + y1) / 2, z); m.castShadow = true; m.receiveShadow = true; par.add(m); return m;
+    }
+    var srnd = rng(41);
+    // outdoor bar under the hatch: brick base, oak top, three stools
+    box(G, 15.5, 18.9, -0.03, 1.0, SZ + 0.05, SZ + 0.55, texBox('brick', 3.4, 1.0, 0.5));
+    box(G, 15.45, 18.95, 1.0, 1.06, SZ + 0.03, SZ + 0.62, MAT.woodLt);
+    [16.0, 17.2, 18.4].forEach(function (sx) { cyl(G, sx, -0.03, 0.7, SZ + 1.05, 0.05, 0.05, MAT.dark, 8); cyl(G, sx, 0.7, 0.76, SZ + 1.05, 0.2, 0.2, MAT.woodDk, 16); });
+    // pergola from the glass hall to the end of the kitchen, vines on top
+    var PG0 = GL + 0.2, PG1 = 19.5, PGH = 2.85, PGZ = SZ + TD - 0.15;
+    for (var pp = 0; pp <= 4; pp++) { var ppx = PG0 + (PG1 - PG0) * pp / 4; box(G, ppx - 0.09, ppx + 0.09, -0.03, PGH, PGZ - 0.09, PGZ + 0.09, MAT.frame); }
+    box(G, PG0 - 0.1, PG1 + 0.1, PGH, PGH + 0.24, PGZ - 0.07, PGZ + 0.07, MAT.frame);                 // beam on the posts
+    box(G, PG0 - 0.1, PG1 + 0.1, PGH, PGH + 0.24, SZ + 0.06, SZ + 0.2, MAT.frame);                    // ledger on the wall
+    for (var rx = PG0; rx <= PG1; rx += 0.6) box(G, rx - 0.03, rx + 0.03, PGH + 0.24, PGH + 0.4, SZ + 0.05, PGZ + 0.35, MAT.frame, { edges: false });
+    for (var vq = 0; vq < 26; vq++) {                                                                    // vine canopy, patchy
+      var vx = PG0 + srnd() * (PG1 - PG0), vz = SZ + 0.3 + srnd() * (TD - 0.4);
+      sphere(G, vx, PGH + 0.5, vz, 0.45 + srnd() * 0.4, srnd() > 0.5 ? MAT.leaf : MAT.leafDk, 0.45);
+    }
+    for (pp = 0; pp <= 4; pp++) { ppx = PG0 + (PG1 - PG0) * pp / 4; sphere(G, ppx, 1.4, PGZ, 0.28, MAT.leafDk, 3.6); }   // vines climbing the posts
+    // gravel strip with tall grasses along the rest of the wall
+    box(G, 19.7, L - 0.1, GY, GY + 0.04, SZ + 0.05, SZ + 1.4, MAT.gravel, { cast: false, edges: false });
+    for (var gq = 0; gq < 46; gq++) {
+      var gx = 19.9 + srnd() * (L - 20.2), gz = SZ + 0.3 + srnd() * 0.95, gh = 0.8 + srnd() * 0.7;
+      var tuft = new THREE.Mesh(new THREE.ConeGeometry(0.22 + srnd() * 0.12, gh, 7), MAT.grassGold);
+      tuft.position.set(gx, GY + gh / 2, gz); tuft.castShadow = true; G.add(tuft);
+    }
+    // meadow with a mown path out to the sauna
+    box(G, -12, 44, GY, GY + 0.012, SZ + TD + 0.5, SZ + 31, MAT.meadow, { cast: false, edges: false });
+    var pth = [], P0 = [4, SZ + TD], P1 = [4.5, SZ + 14], P2 = [10.4, SZ + 19];
+    for (var pt = 0; pt <= 14; pt++) { var t = pt / 14, u = 1 - t; pth.push([u * u * P0[0] + 2 * u * t * P1[0] + t * t * P2[0], u * u * P0[1] + 2 * u * t * P1[1] + t * t * P2[1]]); }
+    for (pt = 0; pt < pth.length - 1; pt++) {
+      var a0 = pth[pt], a1 = pth[pt + 1], sdx = a1[0] - a0[0], sdz = a1[1] - a0[1], sl = Math.sqrt(sdx * sdx + sdz * sdz);
+      var seg = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.016, sl + 0.05), MAT.mown);
+      seg.position.set((a0[0] + a1[0]) / 2, GY + 0.02, (a0[1] + a1[1]) / 2); seg.rotation.y = Math.atan2(sdx, sdz); seg.receiveShadow = true; G.add(seg);
+    }
+    var flowers = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), new THREE.MeshLambertMaterial(), 520), fm = new THREE.Object3D(), fc = new THREE.Color();
+    var fcols = [0xffffff, 0xffffff, 0xf2dc7a, 0xf2dc7a, 0xb79ad8, 0xe7928a], fn = 0;
+    while (fn < 520) {
+      var fx = -11 + srnd() * 54, fz = SZ + TD + 1 + srnd() * 29;
+      if (fx > 9.5 && fx < 19.5 && fz > SZ + 13 && fz < SZ + 22) continue;            // keep the sauna deck clear
+      fm.position.set(fx, GY + 0.05 + srnd() * 0.15, fz); fm.updateMatrix(); flowers.setMatrixAt(fn, fm.matrix);
+      flowers.setColorAt(fn, fc.setHex(fcols[Math.floor(srnd() * fcols.length)])); fn++;
+    }
+    G.add(flowers);
+    // multi-stem birches in front of the guest room and bedroom, shading them on summer evenings
+    function birch(x, z, sc) {
+      for (var b = 0; b < 3; b++) {
+        var tr = cyl(G, 0, 0, 6.2 * sc, 0, 0.1, 0.06, MAT.bark, 8);
+        tr.position.set(x + (b - 1) * 0.25, GY + 3.1 * sc, z + (b % 2 ? 0.2 : -0.15)); tr.rotation.z = (b - 1) * 0.12; tr.rotation.x = (b % 2 ? 0.08 : -0.06);
+      }
+      sphere(G, x, GY + 5.0 * sc, z, 1.7 * sc, MAT.leaf, 1.25); sphere(G, x + 0.9, GY + 4.2 * sc, z + 0.4, 1.2 * sc, MAT.leaf, 1.2); sphere(G, x - 0.8, GY + 6.0 * sc, z - 0.3, 1.1 * sc, MAT.leaf, 1.2);
+    }
+    birch(21.8, SZ + 6.5, 1); birch(25.6, SZ + 8.2, 1.1); birch(28.6, SZ + 5.6, 0.9);
+    // small orchard past the end of the house, a nod to the old farm field
+    for (var oa = 0; oa < 3; oa++) for (var ob = 0; ob < 3; ob++) {
+      var ox = 32 + oa * 4.5, oz = SZ + 11 + ob * 4.5 + (oa % 2) * 1.2;
+      cyl(G, ox, GY, GY + 1.5, oz, 0.13, 0.1, MAT.trunk, 8); sphere(G, ox, GY + 2.6, oz, 1.55, MAT.leafDk, 0.85);
+    }
+    // sauna cabin facing the sunset, deck with hot tub and cold plunge
+    var SX0 = 11.0, SX1 = 15.0, SZ0 = SZ + 14.2, SZ1 = SZ + 16.8;
+    box(G, SX0, SX1, GY, GY + 2.5, SZ0, SZ1, texBox('clad', SX1 - SX0, 2.5, SZ1 - SZ0));
+    box(G, SX0 - 0.3, SX1 + 0.3, GY + 2.5, GY + 2.68, SZ0 - 0.3, SZ1 + 0.6, [M('roofdk'), M('roofdk'), M('seamR', 1, 3.7), M('soffit'), M('roofdk'), M('roofdk')]);
+    box(G, SX0 + 0.5, SX1 - 1.6, GY + 0.9, GY + 2.1, SZ1 - 0.02, SZ1 + 0.03, MAT.glass);                    // window to the sunset
+    box(G, SX1 - 1.3, SX1 - 0.5, GY + 0.25, GY + 2.15, SZ1 - 0.02, SZ1 + 0.04, MAT.woodDk);                 // glass-panel door, closed
+    cyl(G, SX0 + 0.6, GY + 2.6, GY + 3.6, SZ0 + 0.6, 0.09, 0.09, MAT.steel, 10);                            // stove flue
+    box(G, SX0 - 0.6, SX1 + 3.6, GY, GY + 0.25, SZ1, SZ1 + 4.2, [MAT.woodDk, MAT.woodDk, M('deck', SX1 - SX0 + 4.2, 4.2), MAT.woodDk, MAT.woodDk, MAT.woodDk]);
+    cyl(G, SX1 + 1.9, GY + 0.25, GY + 1.15, SZ1 + 2.3, 1.05, 1.05, MAT.woodDk, 28);                         // hot tub
+    cyl(G, SX1 + 1.9, GY + 1.15, GY + 1.17, SZ1 + 2.3, 0.92, 0.92, MAT.pool, 28);
+    box(G, SX0 - 0.3, SX0 + 0.9, GY + 0.25, GY + 1.25, SZ1 + 2.6, SZ1 + 3.8, MAT.steel);                    // cold plunge
+    box(G, SX0 - 0.2, SX0 + 0.8, GY + 1.25, GY + 1.27, SZ1 + 2.7, SZ1 + 3.7, MAT.pool, { edges: false });
+    // windbreak along the far boundary: hedge with trees, kept low across the view from the glass hall
+    var HZ = SZ + 32.5;
+    [[-12, -3, 2.6], [-3, 13, 1.1], [13, 44, 2.6]].forEach(function (h) { box(G, h[0], h[1], GY, GY + h[2], HZ - 0.8, HZ + 0.8, MAT.leafDk, { edges: false }); });
+    [-10, -5, 16, 22, 28, 34, 40].forEach(function (tx, ti) {
+      cyl(G, tx, GY, GY + 3.2, HZ + 0.2, 0.2, 0.14, MAT.trunk, 8); sphere(G, tx, GY + 5.0 + (ti % 2) * 0.8, HZ + 0.2, 2.3 + (ti % 3) * 0.3, ti % 2 ? MAT.leaf : MAT.leafDk, 1.15);
+    });
+
     /* --- king bed upstairs --- */
     var BX1 = L - WT - 0.02, BZ = W / 2;                       // head of the bed against the front wall
     box(upG, BX1 - 2.2, BX1 - 0.1, h2, h2 + 0.32, BZ - 1.0, BZ + 1.0, MAT.woodLt);              // frame, 200 x 210 cm
@@ -933,6 +1034,10 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     tag('Pool', 8, B + 0.4, -10.25); tag('Sun loungers', 6.5, B + 1.1, -6.8);
     tag('Fire pit lounge', FX, B + 1.3, FZ);
     tag('Sunset terrace', 4, B + 0.5, W + 2.0);
+    tag('Kitchen window + bar hatch', 17.2, B + 2.6, W + 0.4); tag('Pergola with vines', 12, B + 3.7, W + 2);
+    tag('Grasses', 24, B + 1.6, W + 0.8); tag('Birches', 25.6, B + 7.8, W + 8.2);
+    tag('Orchard', 36.5, B + 4.2, W + 15.5); tag('Sauna', 13, B + 3.3, W + 15.5); tag('Hot tub + cold plunge', 14.5, B + 1.9, W + 19.5);
+    tag('Meadow path', 5.4, B + 0.5, W + 10); tag('Windbreak hedge', 30, B + 3.3, W + 32.5); tag('Kept low for the view', 5, B + 1.6, W + 32.5);
     tag('Upper terrace', 12, B + h2 + 0.6, -2.0, '', 'upt');
     tag('Stairs to garden', WX0 - 0.7, B + h2 * 0.5 + 1.6, -TD - 2.2, '', 'upt');
     tag('Roof balcony', (WX0 + WX1) / 2, B + h2 + 0.9, WZ / 2 - 1, '', 'roof');
@@ -1139,10 +1244,11 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     var B = BASE, g = geo, mid = g.Hr * 0.4;
     switch (name) {
       case 'layout':  return { pos: [-12, 42, 37], tgt: [13.5, 1, -1], roof: false, xray: true, fit: true };
-      case 'plan':    return { pos: [L / 2 - 3, 90, -4.8], tgt: [L / 2 - 3, 0, -5.5], roof: false, xray: false, fit: true };
+      case 'plan':    return { pos: [L / 2 + 1, 118, 7.3], tgt: [L / 2 + 1, 0, 6.6], roof: false, xray: false, fit: true };
       case 'sofa':    return { pos: [6.9, B + 1.15, W / 2], tgt: [3.2, B + 3.0, W / 2 + 2.2], roof: true, xray: false, fov: 72 };
       case 'balcony': return { pos: [12.3, B + g.h2 + 1.62, g.zb + 0.4], tgt: [6, B + 2.2, W / 2], roof: true, xray: false, fov: 66 };
       case 'terrace': return { pos: [-19, 18, -50], tgt: [16, 2.5, -5], roof: true, xray: false, fit: true };
+      case 'sunset':  return { pos: [L / 2 + 6, 30, W + 44], tgt: [L / 2 - 2, 0, W + 7], roof: true, xray: false, fit: true };
       case 'entrance': return { pos: [L + 31, 14, -32], tgt: [L - 7, 2, -5], roof: true, xray: false, fit: true };
       default:        return { pos: [-22, g.Hr + 10, 33], tgt: [9, 2.5, 3], roof: true, xray: false, fit: true };
     }

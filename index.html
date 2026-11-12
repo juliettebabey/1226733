@@ -102,7 +102,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   <section id="card" aria-label="Model controls">
     <header>
       <h1>Glass barn house</h1>
-      <p class="sub">Layout sketch v16. One grid square is 1 m.</p>
+      <p class="sub">Layout sketch v19. One grid square is 1 m.</p>
     </header>
 
     <div>
@@ -151,7 +151,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
       </div>
     </details>
 
-    <p class="hint">Drag to orbit, scroll to zoom, right-drag to pan. The blue figures are 1.8 m tall.</p>
+    <p class="hint">Drag to orbit, scroll to zoom, right-drag to pan.</p>
   </section>
 
   <div id="crosshair" aria-hidden="true"></div>
@@ -188,6 +188,10 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   var GZ = -14, UZ = -3.4, UX0 = 22.4;     // wing partitions: garage | gym, and the utility room by the house
   var TD = 3.5;     // terrace depth
   var BASE = 0.2;   // floor level above the field
+  var RT = 0.45;    // pitched roof: standing seam, battens, membrane, 24 cm rafters + wool, 8 cm wood-fibre, service batten, board
+  var FT = 0.35;    // upper floor: 24 cm timber joists or CLT, acoustic layer, screed, oak boards
+  var FRT = 0.45;   // flat roof over the wing: deck on pedestals, membrane, tapered insulation, structure
+  var RAILH = 1.1;  // balustrade height on terraces and balconies
   var WT = 0.45;    // outer wall, outside to inside: 2.5 cm larch cladding (or brick slip), 4 cm ventilated gap,
                     // 6 cm wood-fibre board, 24 cm timber frame filled with mineral wool, vapour control layer,
                     // 6 cm insulated service cavity, 2.5 cm clay board = 45 cm, of which 36 cm is insulation
@@ -221,7 +225,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   controls.minDistance = 0.5;
   controls.maxDistance = 140;
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xd9d4c6, 0.66));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xb6ae9f, 0.68));
   var sun = new THREE.DirectionalLight(0xfff4e2, 0.52);
   sun.position.set(L / 2 + 12, 30, W / 2 + 34);   // from the south-west: afternoon sun on the glass side
   sun.target.position.set(L / 2, 0, W / 2);
@@ -268,11 +272,11 @@ body.walking.dragging #stage canvas{cursor:grabbing}
       }
     }),
     floor: tile(256, function (g, s) {           // floor boards running along the house
-      var r = rng(3); g.fillStyle = '#d5b17d'; g.fillRect(0, 0, s, s);
+      var r = rng(3); g.fillStyle = '#b98652'; g.fillRect(0, 0, s, s);
       var bh = s / 6;
       for (var i = 0; i < 6; i++) {
-        g.fillStyle = 'rgba(125,88,42,' + (0.02 + 0.09 * r()).toFixed(3) + ')'; g.fillRect(0, i * bh, s, bh);
-        g.fillStyle = 'rgba(96,68,34,.5)'; g.fillRect(0, i * bh, s, 1.2);
+        g.fillStyle = 'rgba(92,58,24,' + (0.04 + 0.14 * r()).toFixed(3) + ')'; g.fillRect(0, i * bh, s, bh);
+        g.fillStyle = 'rgba(70,44,20,.7)'; g.fillRect(0, i * bh, s, 1.6);
         g.fillRect(Math.floor(r() * s), i * bh, 1.2, bh);
       }
     }),
@@ -297,12 +301,12 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   var KIND = {
     clad:    { tex: 'clad', solid: true },
     brickw:  { tex: 'brick', solid: true },
-    plaster: { color: 0xefe9dd, solid: true },
+    plaster: { color: 0xf4f2ed, solid: true },
     seam:    { tex: 'seam', solid: true },
     seamR:   { tex: 'seamR', solid: true },
     roofdk:  { color: 0x474a4f, solid: true },
     soffit:  { color: 0xdcc296, solid: true },
-    ceil:    { color: 0xdcc296 },
+    ceil:    { color: 0xf6f4ef },
     brick:   { tex: 'brick' },
     floor:   { tex: 'floor' },
     deck:    { tex: 'deck' }
@@ -347,7 +351,8 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     slab: flat(0xd9d5cb),
     ink: flat(0x2a55a6),
     glass: new THREE.MeshPhongMaterial({ color: 0x9fd0dc, transparent: true, opacity: 0.27, shininess: 90, specular: 0xffffff, depthWrite: false }),
-    line: new THREE.LineBasicMaterial({ color: 0x2f3236, transparent: true, opacity: 0.42 }),
+    line: new THREE.LineBasicMaterial({ color: 0x2f3236, transparent: true, opacity: 0.55 }),
+    skirt: new THREE.MeshLambertMaterial({ color: 0x5b4330 }),
     inkLine: new THREE.LineBasicMaterial({ color: 0x2a55a6 }),
     dash: new THREE.LineDashedMaterial({ color: 0x676d74, dashSize: 0.28, gapSize: 0.2 })
   };
@@ -538,10 +543,17 @@ body.walking.dragging #stage canvas{cursor:grabbing}
       box(G, px - 0.08, px + 0.08, 0, He, W - 0.24, W - 0.02, MAT.frame);
     }
     for (r = 0; r <= rows; r++) { var ty = Math.max(0.06, Math.min(r * rowH, He - 0.06)); box(G, 0, GL, ty - 0.06, ty + 0.06, W - 0.22, W - 0.04, MAT.frame, { edges: false }); }
+    function skirtRun(x0, x1, y0, y1, za, zb) {      // dark skirting where an outer wall meets a floor, on each floor it reaches
+      [[0, 0], [h2, ST_X0]].forEach(function (fl) {
+        var a = Math.max(x0, fl[1]);
+        if (x1 - a > 0.05 && y0 <= fl[0] + 0.01 && y1 >= fl[0] + 0.1) box(G, a, x1, fl[0], fl[0] + 0.09, za, zb, MAT.skirt, { edges: false, cast: false });
+      });
+    }
     function westSeg(x0, x1, y0, y1) {
       if (y1 - y0 < 0.02) return;
       box(G, x0, x1, y0, y1, W - WT, W, [M('clad', WT, 1), M('clad', WT, 1), M('plaster'), M('plaster'), M('clad', x1 - x0, 1), M('plaster')]);
       if (y0 < 0) plinth(x0, x1, W, W + PP);
+      skirtRun(x0, x1, y0, y1, W - WT - 0.014, W - WT);
     }
     function westGlass(x0, x1, y0, y1, bays) {
       box(G, x0, x1, y0, y1, W - 0.17, W - 0.13, MAT.glass);
@@ -561,6 +573,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
       if (y1 - y0 < 0.02) return;
       box(G, x0, x1, y0, y1, 0, WT, [M('plaster'), M('plaster'), M('plaster'), M('plaster'), M('plaster'), M('clad', x1 - x0, 1)]);
       if (y0 < 0) plinth(x0, x1, -PP, 0);
+      skirtRun(x0, x1, y0, y1, WT, WT + 0.014);
     }
     function eastGlass(x0, x1, y0, y1, bays, railsAt) {
       box(G, x0, x1, y0, y1, 0.13, 0.17, MAT.glass);
@@ -608,12 +621,12 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     var OV = 0.5 / Math.cos(pr), OX = 0.5;           // 50 cm overhang, measured flat, on the long sides (OV) and past both gable ends (OX)
     function roofSlab(g, side, x0, x1) {
       var z0 = side === 'west' ? -S - 0.1 : -0.12 - OV, z1 = side === 'west' ? 0.12 + OV : S + 0.1;
-      box(g, x0, x1, 0, 0.3, z0, z1, [M('roofdk'), M('roofdk'), M('seam', x1 - x0, 1), M('soffit'), M('roofdk'), M('roofdk')]);
+      box(g, x0, x1, 0, RT, z0, z1, [M('roofdk'), M('roofdk'), M('seam', x1 - x0, 1), M('soffit'), M('roofdk'), M('roofdk')]);
     }
     roofSlab(east, 'east', -OX, L + OX);     // terrace side: solid over the whole length
     roofSlab(west, 'west', GL, L + OX);      // sunset side: solid only past the glass
-    box(west, 0, GL, 0.02, 0.07, -S, 0.05, MAT.glass);                       // glass roof, flush with the glass gable
-    for (xp = 0; xp <= GL; xp += 2) { px = Math.min(Math.max(xp, 0.1), GL - 0.1); box(west, px - 0.08, px + 0.08, -0.24, 0.02, -S + 0.05, 0, MAT.frame); }
+    box(west, 0, GL, RT - 0.07, RT - 0.02, -S, 0.05, MAT.glass);             // glass roof, flush with the glass gable and with the solid roof
+    for (xp = 0; xp <= GL; xp += 2) { px = Math.min(Math.max(xp, 0.1), GL - 0.1); box(west, px - 0.08, px + 0.08, 0, RT - 0.07, -S + 0.05, 0, MAT.frame); }   // glulam rafters carrying the glass
     box(west, 0, GL, -0.14, 0.0, -S / 2 - 0.07, -S / 2 + 0.07, MAT.frame, { edges: false });   // purlin
     box(roofG, 0.05, L + OX, Hr - 0.5, Hr - 0.12, W / 2 - 0.1, W / 2 + 0.1, MAT.frame);         // ridge beam
     // solar on the sunset slope of the solid part
@@ -621,12 +634,12 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     var rowsS = S > 2 * ph + 0.9 ? 2 : 1;
     for (var rs = 0; rs < rowsS; rs++) for (var c = 0; c < cols; c++) {
       var s0 = 0.45 + rs * (ph + 0.06);
-      box(west, sx0 + c * (pw + 0.05), sx0 + c * (pw + 0.05) + pw, 0.33, 0.37, -(s0 + ph), -s0, MAT.panel, { cast: false });
+      box(west, sx0 + c * (pw + 0.05), sx0 + c * (pw + 0.05) + pw, RT + 0.03, RT + 0.07, -(s0 + ph), -s0, MAT.panel, { cast: false });
     }
 
     /* --- L wing towards the terrace side, 10 x 20 m, one storey; its flat roof is a balcony level with the upper terrace.
            From the house outwards: laundry + technical room, garage + workshop, gym (floor 45 cm lower for a 3.2 m ceiling). --- */
-    var We = h2 - 0.25, wwid = WX1 - WX0, GF = -0.45;
+    var We = h2 - FRT, wwid = WX1 - WX0, GF = -0.45;
     function wingWall(x0, x1, z0, z1, outFace) {       // solid timber wall; outFace = which face shows cladding
       var m = [M('plaster'), M('plaster'), M('plaster'), M('plaster'), M('plaster'), M('plaster')];
       m[outFace] = M('clad', outFace < 2 ? z1 - z0 : x1 - x0, 1);
@@ -670,7 +683,6 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     railX(roofG, WX0 + 0.03, WZ, -TD); railZ(roofG, WZ + 0.03, WX0, WX1); railX(roofG, WX1 - 0.03, WZ, 0);
     [-11.6, -10.4].forEach(function (lz) { box(roofG, WX0 + 2, WX0 + 4, h2, h2 + 0.32, lz - 0.35, lz + 0.35, MAT.white); });
     box(roofG, WX0 + 5.6, WX0 + 7.6, h2 + 0.68, h2 + 0.74, -5.4, -4.4, MAT.woodLt);
-    person(roofG, WX0 + 6, h2, -8.2);
 
     // garage: double door facing the entrance side, two cars, workbench with tool wall, bikes, ski cabinets
     box(G, WX1 - 0.02, WX1 + 0.05, 0, 2.4, -13, -7.5, MAT.woodDk);
@@ -705,7 +717,6 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     box(G, WX1 - WT - 0.55, WX1 - WT, GF, GF + 0.8, -19.0, -16.8, MAT.dark);                                                     // dumbbell rack
     box(G, 21.0, 21.5, GF, GF + 0.35, -19.0, -16.6, MAT.steel);                                                    // rower
     box(G, WX1 - WT - 0.03, WX1 - WT, GF + 0.3, GF + 2.4, -18.5, -15.0, MAT.rug, { edges: false, cast: false });                // mirror
-    person(G, 23.0, GF, -16.0);
 
     // main entrance on the far end, with a small canopy, and a forecourt in front of both doors
     box(G, L - WT - 1.1, L - WT, 0, 2.3, W / 2 + 0.92, W / 2 + 0.98, MAT.woodDk);           // front door, standing open
@@ -751,12 +762,12 @@ body.walking.dragging #stage canvas{cursor:grabbing}
 
     /* --- upper floor: starts at the stairs and only goes right --- */
     var up = [M('ceil'), M('ceil'), M('floor', 1, 1), M('ceil'), M('ceil'), M('ceil')];
-    function slab(x0, x1, z0, z1) { var m = up.slice(); m[2] = M('floor', x1 - x0, z1 - z0); box(upG, x0, x1, h2 - 0.3, h2, z0, z1, m); }
+    function slab(x0, x1, z0, z1) { var m = up.slice(); m[2] = M('floor', x1 - x0, z1 - z0); box(upG, x0, x1, h2 - FT, h2, z0, z1, m); }
     slab(ST_X1, L - WT, WT, W - WT);            // main deck
     slab(ST_X0, ST_X1, WT, ST_ZT);              // landing at the top of the stairs
     slab(ST_X0, ST_X1, ST_ZB, W - WT);          // balcony nook over the living room
-    function railX(par, x, z0, z1) { box(par, x - 0.02, x + 0.02, h2, h2 + 1.0, z0, z1, MAT.glass).userData.rail = true; box(par, x - 0.04, x + 0.04, h2 + 1.0, h2 + 1.06, z0, z1, MAT.frame, { edges: false }); }
-    function railZ(par, z, x0, x1) { box(par, x0, x1, h2, h2 + 1.0, z - 0.02, z + 0.02, MAT.glass).userData.rail = true; box(par, x0, x1, h2 + 1.0, h2 + 1.06, z - 0.04, z + 0.04, MAT.frame, { edges: false }); }
+    function railX(par, x, z0, z1) { box(par, x - 0.02, x + 0.02, h2, h2 + RAILH, z0, z1, MAT.glass).userData.rail = true; box(par, x - 0.04, x + 0.04, h2 + RAILH, h2 + RAILH + 0.06, z0, z1, MAT.frame, { edges: false }); }
+    function railZ(par, z, x0, x1) { box(par, x0, x1, h2, h2 + RAILH, z - 0.02, z + 0.02, MAT.glass).userData.rail = true; box(par, x0, x1, h2 + RAILH, h2 + RAILH + 0.06, z - 0.04, z + 0.04, MAT.frame, { edges: false }); }
     railX(upG, ST_X0 + 0.02, WT, ST_ZT); railX(upG, ST_X0 + 0.02, ST_ZB, W - WT);       // edge over the living room
     railX(upG, ST_X1, ST_ZT, ST_ZB); railZ(upG, ST_ZB, ST_X0, ST_X1);                   // around the stair opening
     // cushion chairs on the balcony
@@ -783,13 +794,31 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     var IT = 0.06;                                                 // half the wall thickness
     function wallX(par, z, x0, x1, y0, y1, gaps) {                 // wall running along the house at a fixed z
       var xs = [x0]; (gaps || []).forEach(function (g) { xs.push(g[0], g[1]); }); xs.push(x1);
-      for (var q = 0; q < xs.length; q += 2) if (xs[q + 1] - xs[q] > 0.02) box(par, xs[q], xs[q + 1], y0, y1, z - IT, z + IT, M('plaster'));
-      (gaps || []).forEach(function (g) { box(par, g[0], g[1], y0 + 2.1, y1, z - IT, z + IT, M('plaster')); });
+      for (var q = 0; q < xs.length; q += 2) if (xs[q + 1] - xs[q] > 0.02) {
+        box(par, xs[q], xs[q + 1], y0, y1, z - IT, z + IT, M('plaster'));
+        box(par, xs[q], xs[q + 1], y0, y0 + 0.09, z - IT - 0.014, z + IT + 0.014, MAT.skirt, { edges: false, cast: false });
+      }
+      (gaps || []).forEach(function (g) {
+        box(par, g[0], g[1], y0 + 2.1, y1, z - IT, z + IT, M('plaster'));
+        var ca = z - IT - 0.018, cb = z + IT + 0.018;                 // door casing: two jambs and a head
+        box(par, g[0] - 0.07, g[0], y0, y0 + 2.17, ca, cb, MAT.skirt, { edges: false, cast: false });
+        box(par, g[1], g[1] + 0.07, y0, y0 + 2.17, ca, cb, MAT.skirt, { edges: false, cast: false });
+        box(par, g[0] - 0.07, g[1] + 0.07, y0 + 2.1, y0 + 2.17, ca, cb, MAT.skirt, { edges: false, cast: false });
+      });
     }
     function wallZ(par, x, z0, z1, y0, y1, gaps) {                 // wall running across the house at a fixed x
       var zs = [z0]; (gaps || []).forEach(function (g) { zs.push(g[0], g[1]); }); zs.push(z1);
-      for (var q = 0; q < zs.length; q += 2) if (zs[q + 1] - zs[q] > 0.02) box(par, x - IT, x + IT, y0, y1, zs[q], zs[q + 1], M('plaster'));
-      (gaps || []).forEach(function (g) { box(par, x - IT, x + IT, y0 + 2.1, y1, g[0], g[1], M('plaster')); });
+      for (var q = 0; q < zs.length; q += 2) if (zs[q + 1] - zs[q] > 0.02) {
+        box(par, x - IT, x + IT, y0, y1, zs[q], zs[q + 1], M('plaster'));
+        box(par, x - IT - 0.014, x + IT + 0.014, y0, y0 + 0.09, zs[q], zs[q + 1], MAT.skirt, { edges: false, cast: false });
+      }
+      (gaps || []).forEach(function (g) {
+        box(par, x - IT, x + IT, y0 + 2.1, y1, g[0], g[1], M('plaster'));
+        var ca = x - IT - 0.018, cb = x + IT + 0.018;
+        box(par, ca, cb, y0, y0 + 2.17, g[0] - 0.07, g[0], MAT.skirt, { edges: false, cast: false });
+        box(par, ca, cb, y0, y0 + 2.17, g[1], g[1] + 0.07, MAT.skirt, { edges: false, cast: false });
+        box(par, ca, cb, y0 + 2.1, y0 + 2.17, g[0] - 0.07, g[1] + 0.07, MAT.skirt, { edges: false, cast: false });
+      });
     }
     var uy0 = h2, uy1 = h2 + 2.7, zi = WT, zo = W - WT, RX = 19.75;
     // upstairs: two rooms either side of a corridor, then the bedroom with its en-suite
@@ -800,7 +829,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     wallX(roomUpG, W - 3.75, RX, 23.75, uy0, uy1);
     wallZ(roomUpG, 23.75, W - 3.75, zo, uy0, uy1, [[W - 2.9, W - 2.0]]);      // en-suite door from the bedroom
     // ground floor: corridor from the kitchen to the entrance hall, rooms either side
-    var dy1 = h2 - 0.3, GX0 = 24.5 + o - 0.1, GX1 = L - WT;
+    var dy1 = h2 - FT, GX0 = 24.5 + o - 0.1, GX1 = L - WT;
     wallZ(roomDnG, GX0, zi, gE, 0, dy1); wallZ(roomDnG, GX0, gW, zo, 0, dy1);
     wallX(roomDnG, gE, GX0, GX1, 0, dy1, [[21.0, 21.9], [23.6, 24.5]]);       // bathroom door, wardrobe door
     wallZ(roomDnG, 27.65 + o, zi, gE, 0, dy1);                                 // bathroom | wardrobe
@@ -861,7 +890,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
       box(seat, -0.85, 0.85, GY + 0.42, GY + 0.85, -0.42, -0.3, MAT.woodLt, { edges: false });
     }
 
-    /* --- people for scale (1.8 m) --- */
+    /* --- king bed upstairs --- */
     var BX1 = L - WT - 0.02, BZ = W / 2;                       // head of the bed against the front wall
     box(upG, BX1 - 2.2, BX1 - 0.1, h2, h2 + 0.32, BZ - 1.0, BZ + 1.0, MAT.woodLt);              // frame, 200 x 210 cm
     box(upG, BX1 - 2.15, BX1 - 0.12, h2 + 0.32, h2 + 0.55, BZ - 0.95, BZ + 0.95, MAT.white, { edges: false });   // mattress
@@ -869,7 +898,6 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     box(upG, BX1 - 0.1, BX1, h2, h2 + 1.15, BZ - 1.1, BZ + 1.1, MAT.woodDk);                  // headboard
     [-0.48, 0.48].forEach(function (pz) { box(upG, BX1 - 0.55, BX1 - 0.15, h2 + 0.55, h2 + 0.7, BZ + pz - 0.35, BZ + pz + 0.35, MAT.white, { edges: false }); });
     [-1, 1].forEach(function (sd) { box(upG, BX1 - 0.45, BX1, h2, h2 + 0.5, BZ + sd * 1.15 - 0.25, BZ + sd * 1.15 + 0.25, MAT.woodDk); });   // bedside tables
-    person(hallG, 4.9, 0, 6.3); person(upG, 14.3, h2, W / 2 + 1.3); person(G, 12.5, -0.03, -1.8); person(uptG, 6, h2, -1.8); person(G, L + 2.5, -BASE, W / 2 - 0.8);
 
     /* --- dimension lines (blue pen) --- */
     var gy = -BASE + 0.03, dx = -TD - 1.2, dzl = W + TD + 1.2;
@@ -940,6 +968,8 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   var marker = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.3, 36), new THREE.MeshBasicMaterial({ color: 0x2a55a6, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
   marker.rotation.x = -Math.PI / 2; marker.visible = false; marker.renderOrder = 5; scene.add(marker);
   var hud = document.getElementById('walkhud');
+  var lamp = new THREE.PointLight(0xfff0da, 0.45, 11, 1.6); lamp.visible = false;
+  camera.add(lamp); scene.add(camera);
   function shown(o) { for (var a = o; a; a = a.parent) if (!a.visible) return false; return true; }
   function walkLists() {                    // what you can stand on, and what stops you (glass walls act as open doors; balustrades do not)
     if (!walk.dirty) return;
@@ -1018,12 +1048,12 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     var f = floorAt(walk.x, walk.z, 2.5); walk.feet = f === null ? 0 : f;
     walk.yaw = Math.atan2(-0.42, 0.9); walk.pitch = 0.06;
     camera.fov = 72; camera.updateProjectionMatrix();
-    hud.hidden = false; document.body.classList.add('walking');
+    hud.hidden = false; document.body.classList.add('walking'); lamp.visible = true;
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   }
   function exitWalk() {
     walk.on = false; walk.keys = {}; walk.target = null; marker.visible = false;
-    controls.enabled = true; hud.hidden = true; document.body.classList.remove('walking', 'dragging', 'locked');
+    controls.enabled = true; hud.hidden = true; lamp.visible = false; document.body.classList.remove('walking', 'dragging', 'locked');
     if (locked() && document.exitPointerLock) document.exitPointerLock();
     aimNote.classList.remove('show');
   }

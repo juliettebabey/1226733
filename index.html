@@ -68,7 +68,18 @@ button.view.walk[aria-pressed="true"]{color:#fff}
 .pad{display:none;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);gap:4px}
 .pad button{font:inherit;font-size:18px;color:var(--graphite);background:#fff;border:1px solid var(--grid);border-radius:8px;touch-action:none;user-select:none;-webkit-user-select:none}
 .pad .up{grid-column:2;grid-row:1}.pad .lt{grid-column:1;grid-row:2}.pad .dn{grid-column:2;grid-row:2}.pad .rt{grid-column:3;grid-row:2}
-@media (pointer:coarse){.pad{display:grid}#walkhud .keys{display:none}}
+#walk-aim{font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--ink);border-radius:6px;padding:6px 11px;cursor:pointer}
+#walk-aim:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+#walkhud .locked-text,#walkhud .aim-note{display:none}
+body.locked #walkhud .free-text,body.locked #walk-aim{display:none}
+body.locked #walkhud .locked-text{display:inline}
+#walkhud .aim-note.show{display:block;flex-basis:100%;text-align:center;font-size:12px;color:var(--graphite-soft);margin:0}
+#crosshair{position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;pointer-events:none;display:none}
+#crosshair::before,#crosshair::after{content:"";position:absolute;background:#fff;box-shadow:0 0 0 1px rgba(42,85,166,.9)}
+#crosshair::before{left:8px;top:2px;width:2px;height:14px}
+#crosshair::after{left:2px;top:8px;width:14px;height:2px}
+body.locked #crosshair{display:block}
+@media (pointer:coarse){.pad{display:grid}#walkhud .keys{display:none}#walk-aim{display:none}}
 body.walking #stage canvas{cursor:grab}
 body.walking.dragging #stage canvas{cursor:grabbing}
 @media (max-width:640px){
@@ -91,7 +102,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   <section id="card" aria-label="Model controls">
     <header>
       <h1>Glass barn house</h1>
-      <p class="sub">Layout sketch v13. One grid square is 1 m.</p>
+      <p class="sub">Layout sketch v14. One grid square is 1 m.</p>
     </header>
 
     <div>
@@ -142,8 +153,10 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     <p class="hint">Drag to orbit, scroll to zoom, right-drag to pan. The blue figures are 1.8 m tall.</p>
   </section>
 
+  <div id="crosshair" aria-hidden="true"></div>
   <div id="walkhud" hidden>
-    <p><span class="keys">Drag to look around. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to walk, <kbd>Shift</kbd> to run. </span>Click or tap the floor to walk there.</p>
+    <p><span class="free-text"><span class="keys">Drag to look around. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to walk, <kbd>Shift</kbd> to run. </span>Click or tap the floor to walk there.</span><span class="locked-text">Mouse aims. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to walk, <kbd>Shift</kbd> to run, click to walk to the crosshair. <kbd>Esc</kbd> frees the mouse.</span></p>
+    <button type="button" id="walk-aim">Mouse aim (FPS)</button>
     <div class="pad" role="group" aria-label="Walk controls">
       <button type="button" class="up" data-k="f" aria-label="Walk forward">↑</button>
       <button type="button" class="lt" data-k="tl" aria-label="Turn left">↺</button>
@@ -151,6 +164,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
       <button type="button" class="rt" data-k="tr" aria-label="Turn right">↻</button>
     </div>
     <button type="button" id="walk-exit">Exit walk</button>
+    <p class="aim-note" id="aim-note" role="status"></p>
   </div>
 
   <div id="fail" hidden>The 3D library did not load, so the model cannot be shown. Reload the page to try again.</div>
@@ -887,7 +901,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   }
 
   /* ---------- walk mode: first person, Street View style ---------- */
-  var EYE = 1.65, STEP = 0.36, RAD = 0.3;
+  var EYE = 1.65, STEP = 0.36, RAD = 0.3, aimTick = 0;
   var walk = { on: false, x: 0, z: 0, feet: 0, yaw: 0, pitch: 0, keys: {}, target: null, dirty: true, solid: [], floor: [] };
   var wRay = new THREE.Raycaster(), wO = new THREE.Vector3(), wD = new THREE.Vector3(), DOWN = new THREE.Vector3(0, -1, 0), wN = new THREE.Vector2();
   var marker = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.3, 36), new THREE.MeshBasicMaterial({ color: 0x2a55a6, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
@@ -947,6 +961,10 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     }
     var f = floorAt(walk.x, walk.z, walk.feet + STEP);
     if (f !== null) walk.feet += (f - walk.feet) * Math.min(1, dt * 14);
+    if (locked() && !walk.target && (aimTick++ % 3 === 0)) {     // ring under the crosshair
+      var rc = renderer.domElement.getBoundingClientRect(), p = pickFloor(rc.left + rc.width / 2, rc.top + rc.height / 2);
+      marker.visible = !!p; if (p) marker.position.set(p.x, p.y + 0.02, p.z);
+    }
     camera.position.set(walk.x, walk.feet + EYE, walk.z);
     camera.rotation.set(walk.pitch, walk.yaw, 0, 'YXZ');
   }
@@ -972,12 +990,14 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   }
   function exitWalk() {
     walk.on = false; walk.keys = {}; walk.target = null; marker.visible = false;
-    controls.enabled = true; hud.hidden = true; document.body.classList.remove('walking', 'dragging');
+    controls.enabled = true; hud.hidden = true; document.body.classList.remove('walking', 'dragging', 'locked');
+    if (locked() && document.exitPointerLock) document.exitPointerLock();
+    aimNote.classList.remove('show');
   }
   var KEYS = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', KeyD: 'r', ArrowLeft: 'tl', ArrowRight: 'tr', ShiftLeft: 'run', ShiftRight: 'run' };
   window.addEventListener('keydown', function (e) {
     if (!walk.on) return;
-    if (e.key === 'Escape') { goTo('sketch'); return; }
+    if (e.key === 'Escape') { if (locked()) { if (document.exitPointerLock) document.exitPointerLock(); } else if (performance.now() - unlockedAt > 400) goTo('sketch'); return; }
     var k = KEYS[e.code];
     if (k && !(e.target && e.target.tagName === 'INPUT')) { walk.keys[k] = true; walk.target = null; marker.visible = false; e.preventDefault(); }
   });
@@ -990,7 +1010,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     try { dom.setPointerCapture(e.pointerId); } catch (err) {}
   });
   dom.addEventListener('pointermove', function (e) {
-    if (!walk.on) return;
+    if (!walk.on || locked()) return;
     if (drag) {
       var dx = e.clientX - drag.lx, dy = e.clientY - drag.ly; drag.lx = e.clientX; drag.ly = e.clientY;
       drag.moved += Math.abs(dx) + Math.abs(dy);
@@ -1006,9 +1026,10 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   });
   function endDrag(e) {
     if (!walk.on || !drag) return;
-    if (drag.moved <= 5) {
+    if (drag.moved <= 5 || locked()) {
       walkLists();
-      var p = pickFloor(e.clientX, e.clientY);
+      var rc = dom.getBoundingClientRect();
+      var p = locked() ? pickFloor(rc.left + rc.width / 2, rc.top + rc.height / 2) : pickFloor(e.clientX, e.clientY);
       if (p) { walk.target = p.clone(); marker.position.set(p.x, p.y + 0.02, p.z); marker.visible = true; }
     }
     drag = null; document.body.classList.remove('dragging');
@@ -1021,6 +1042,34 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { b.addEventListener(ev, function () { walk.keys[k] = false; }); });
   });
   document.getElementById('walk-exit').addEventListener('click', function () { goTo('sketch'); });
+
+  // FPS mouse aim: pointer lock, requested only from a click
+  var aimNote = document.getElementById('aim-note'), unlockedAt = 0;
+  function locked() { return document.pointerLockElement === dom; }
+  function aimRefused() {
+    aimNote.textContent = 'This page is not allowed to capture the mouse here. Open index.html from your folder in a browser tab for mouse aim.';
+    aimNote.classList.add('show');
+  }
+  document.getElementById('walk-aim').addEventListener('click', function () {
+    aimNote.classList.remove('show');
+    try {
+      if (!dom.requestPointerLock) { aimRefused(); return; }
+      var r = dom.requestPointerLock();
+      if (r && r.catch) r.catch(aimRefused);
+    } catch (err) { aimRefused(); }
+  });
+  document.addEventListener('pointerlockerror', aimRefused);
+  document.addEventListener('pointerlockchange', function () {
+    var on = locked();
+    document.body.classList.toggle('locked', on);
+    if (!on) { unlockedAt = performance.now(); marker.visible = false; }
+    walk.target = null;
+  });
+  document.addEventListener('mousemove', function (e) {
+    if (!walk.on || !locked()) return;
+    walk.yaw -= (e.movementX || 0) * 0.0022;
+    walk.pitch = Math.max(-1.45, Math.min(1.45, walk.pitch - (e.movementY || 0) * 0.0022));
+  });
 
   /* ---------- views ---------- */
   function viewDef(name) {

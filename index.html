@@ -75,7 +75,7 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
   <section id="card" aria-label="Model controls">
     <header>
       <h1>Glass barn house</h1>
-      <p class="sub">Layout sketch v10. One grid square is 1 m.</p>
+      <p class="sub">Layout sketch v12. One grid square is 1 m.</p>
     </header>
 
     <div>
@@ -286,6 +286,9 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
     water: flat(0xa9d3dc),
     gravel: flat(0xdedad0),
     rubber: flat(0x3b3e42),
+    pool: flat(0x7fc4d4),
+    paving: flat(0xd8d2c4),
+    grass: flat(0xcfdcb8),
     steel: flat(0x6f757c),
     woodDk: flat(0xa88255),
     woodLt: flat(0xd3b181),
@@ -746,6 +749,41 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
       box(G, cx - 0.22, cx + 0.22, 0.45, 0.88, j ? cz + 0.4 : cz, j ? cz + 0.45 : cz + 0.05, MAT.woodDk, { edges: false });
     });
 
+    /* --- garden --- */
+    var GY = -BASE;                                            // ground level, relative to the floor
+    // outdoor kitchen under the upper terrace, against the solid wall between the glass hall and the kitchen doors
+    box(G, 10.8, 14.6, GY, 0.9, -0.75, -0.08, MAT.brick === undefined ? MAT.stone : texBox('brick', 3.8, 1.1, 0.67));
+    box(G, 10.75, 14.65, 0.9, 0.95, -0.8, -0.06, MAT.stone, { edges: false });
+    box(G, 11.1, 12.3, 0.95, 1.05, -0.65, -0.18, MAT.dark);                                // grill
+    box(G, 13.2, 13.8, 0.93, 0.96, -0.6, -0.25, MAT.steel, { edges: false });              // sink
+    // outdoor dining, covered, in front of the glass hall
+    box(G, 6.0, 9.2, 0.7, 0.76, -2.75, -1.85, MAT.woodLt);
+    [[6.2, -2.65], [9.0, -2.65], [6.2, -1.95], [9.0, -1.95]].forEach(function (q) { box(G, q[0] - 0.05, q[0] + 0.05, GY, 0.7, q[1] - 0.05, q[1] + 0.05, MAT.woodDk, { edges: false }); });
+    box(G, 6.1, 9.1, GY, 0.45, -3.3, -2.95, MAT.woodDk); box(G, 6.1, 9.1, GY, 0.45, -1.65, -1.3, MAT.woodDk);   // benches
+    // pool in the courtyard, 12 x 4.5 m, on a paved deck, with sun loungers on the house side
+    var PX0 = 2, PX1 = 14, PZ0 = -12.5, PZ1 = -8;
+    box(G, 0.5, 16, GY, GY + 0.03, -14, -5.5, MAT.paving, { cast: false, edges: false });
+    [[PX0 - 0.4, PX1 + 0.4, PZ0 - 0.4, PZ0], [PX0 - 0.4, PX1 + 0.4, PZ1, PZ1 + 0.4], [PX0 - 0.4, PX0, PZ0, PZ1], [PX1, PX1 + 0.4, PZ0, PZ1]].forEach(function (c) {
+      box(G, c[0], c[1], GY + 0.03, GY + 0.1, c[2], c[3], MAT.white, { cast: false, edges: false });   // coping
+    });
+    box(G, PX0, PX1, GY + 0.03, GY + 0.07, PZ0, PZ1, MAT.pool, { cast: false, edges: false }).receiveShadow = false;
+    [3.2, 5.4, 7.6, 9.8].forEach(function (lx) {
+      box(G, lx - 0.35, lx + 0.35, GY, GY + 0.35, -7.6, -5.8, MAT.white);
+      box(G, lx - 0.35, lx + 0.35, GY + 0.35, GY + 0.75, -5.95, -5.8, MAT.white, { edges: false });
+    });
+    // fire pit lounge in the courtyard, past the pool deck, open towards the pool
+    var FX = 8, FZ = -18.2;
+    var pad = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 0.05, 40), MAT.paving);
+    pad.position.set(FX, GY + 0.025, FZ); pad.receiveShadow = true; G.add(pad);
+    var pit = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.4, 24), MAT.brick === undefined ? MAT.stone : new THREE.MeshLambertMaterial({ color: 0xb07a5c }));
+    pit.position.set(FX, GY + 0.2, FZ); pit.castShadow = true; G.add(pit);
+    for (var fs = 0; fs < 5; fs++) {                          // five low wooden sofas in a ring, open towards the pool
+      var ang = Math.PI * (1.25 + fs * 0.375), seat = new THREE.Group();
+      seat.position.set(FX + Math.sin(ang) * 2.3, 0, FZ - Math.cos(ang) * 2.3); seat.rotation.y = -ang; G.add(seat);
+      box(seat, -0.85, 0.85, GY, GY + 0.42, -0.35, 0.35, MAT.woodLt);
+      box(seat, -0.85, 0.85, GY + 0.42, GY + 0.85, -0.42, -0.3, MAT.woodLt, { edges: false });
+    }
+
     /* --- people for scale (1.8 m) --- */
     var BX1 = L - WT - 0.02, BZ = W / 2;                       // head of the bed against the front wall
     box(upG, BX1 - 2.2, BX1 - 0.1, h2, h2 + 0.32, BZ - 1.0, BZ + 1.0, MAT.woodLt);              // frame, 200 x 210 cm
@@ -785,7 +823,10 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
     tag('Dirt bikes + bikes', 26 + o, B + 1.6, -4.4); tag('Ski gear', 26, B + 2.5, UZ - 0.4);
     tag('Laundry + technical', 25.6, B + 1.4, -1.7); tag('Gym', 24.6, B + GF + 2.6, -17.5);
     tag('Stairs down', -TD + 0.7, B + h2 * 0.5 + 1.6, W / 2 + 2.2, '', 'upt');
-    tag('Terrace', 15, B + 0.5, -2.0);
+    tag('Terrace', 3, B + 0.5, -2.0);
+    tag('Outdoor kitchen + grill', 12.7, B + 1.5, -0.6); tag('Outdoor dining', 7.6, B + 1.3, -2.3);
+    tag('Pool', 8, B + 0.4, -10.25); tag('Sun loungers', 6.5, B + 1.1, -6.8);
+    tag('Fire pit lounge', FX, B + 1.3, FZ);
     tag('Sunset terrace', 4, B + 0.5, W + 2.0);
     tag('Upper terrace', 12, B + h2 + 0.6, -2.0, '', 'upt');
     tag('Stairs to garden', WX0 - 0.7, B + h2 * 0.5 + 1.6, -TD - 2.2, '', 'upt');

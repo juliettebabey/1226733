@@ -75,7 +75,7 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
   <section id="card" aria-label="Model controls">
     <header>
       <h1>Glass barn house</h1>
-      <p class="sub">Layout sketch v9. One grid square is 1 m.</p>
+      <p class="sub">Layout sketch v10. One grid square is 1 m.</p>
     </header>
 
     <div>
@@ -141,7 +141,8 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
   var W = 9.5;      // house width (the sketch had 8; widened for roomier landings and walkways)
   var GL = 8;       // length of the glass wall + glass roof section
   var L = 29.5;     // length of the main bar
-  var WX0 = 19.5, WX1 = 29.5, WZ = -14;   // L wing: turns towards the terrace side at the far end
+  var WX0 = 19.5, WX1 = 29.5, WZ = -20;   // L wing: turns towards the terrace side at the far end
+  var GZ = -14, UZ = -3.4, UX0 = 22.4;     // wing partitions: garage | gym, and the utility room by the house
   var TD = 3.5;     // terrace depth
   var BASE = 0.2;   // floor level above the field
   var WT = 0.3;     // wall thickness
@@ -284,6 +285,8 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
     car: flat(0x7d8892),
     water: flat(0xa9d3dc),
     gravel: flat(0xdedad0),
+    rubber: flat(0x3b3e42),
+    steel: flat(0x6f757c),
     woodDk: flat(0xa88255),
     woodLt: flat(0xd3b181),
     leather: flat(0xa2623a),
@@ -569,31 +572,89 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
       box(west, sx0 + c * (pw + 0.05), sx0 + c * (pw + 0.05) + pw, 0.33, 0.37, -(s0 + ph), -s0, MAT.panel, { cast: false });
     }
 
-    /* --- L wing towards the terrace side: single-storey garage + workshop, 10 x 14 m; its flat roof is a balcony level with the upper terrace --- */
-    var We = h2 - 0.25, wlen = -WZ, wwid = WX1 - WX0;
-    box(G, WX0, WX1, -BASE - 0.05, 0, WZ, 0, MAT.slab, { cast: false });
-    box(G, WX0, WX0 + WT, -BASE, We, WZ, 0, [M('plaster'), M('clad', wlen, 1), M('plaster'), M('plaster'), M('clad', WT, 1), M('clad', WT, 1)]);
-    box(G, WX1 - WT, WX1, -BASE, We, WZ, 0, [M('clad', wlen, 1), M('plaster'), M('plaster'), M('plaster'), M('clad', WT, 1), M('clad', WT, 1)]);
-    box(G, WX0, WX1, -BASE, We, WZ, WZ + WT, [M('clad', WT, 1), M('clad', WT, 1), M('plaster'), M('plaster'), M('plaster'), M('clad', wwid, 1)]);
-    plinth(WX0 - PP, WX0, WZ - PP, -PP); plinth(WX0 - PP, WX1 + PP, WZ - PP, WZ);
-    plinth(WX1, WX1 + PP, WZ - PP, -13.1); plinth(WX1, WX1 + PP, -7.4, -PP);
+    /* --- L wing towards the terrace side, 10 x 20 m, one storey; its flat roof is a balcony level with the upper terrace.
+           From the house outwards: laundry + technical room, garage + workshop, gym (floor 45 cm lower for a 3.2 m ceiling). --- */
+    var We = h2 - 0.25, wwid = WX1 - WX0, GF = -0.45;
+    function wingWall(x0, x1, z0, z1, outFace) {       // solid timber wall; outFace = which face shows cladding
+      var m = [M('plaster'), M('plaster'), M('plaster'), M('plaster'), M('plaster'), M('plaster')];
+      m[outFace] = M('clad', outFace < 2 ? z1 - z0 : x1 - x0, 1);
+      box(G, x0, x1, -BASE, We, z0, z1, m);
+    }
+    function wingGlassX(x, z0, z1, bays) {             // glass wall standing across x, from gym floor to ceiling
+      box(G, x - 0.02, x + 0.02, GF, We, z0, z1, MAT.glass);
+      for (var b = 0; b <= bays; b++) { var bz = z0 + (z1 - z0) * b / bays; box(G, x - 0.1, x + 0.1, GF, We, bz - 0.07, bz + 0.07, MAT.frame); }
+      box(G, x - 0.1, x + 0.1, We - 0.12, We, z0, z1, MAT.frame, { edges: false });
+    }
+    function wingGlassZ(z, x0, x1, bays) {
+      box(G, x0, x1, GF, We, z - 0.02, z + 0.02, MAT.glass);
+      for (var b = 0; b <= bays; b++) { var bx = x0 + (x1 - x0) * b / bays; box(G, bx - 0.07, bx + 0.07, GF, We, z - 0.1, z + 0.1, MAT.frame); }
+      box(G, x0, x1, We - 0.12, We, z - 0.1, z + 0.1, MAT.frame, { edges: false });
+    }
+    function partZ(z, x0, x1, gaps) {                  // interior partition across the wing, with door openings
+      var xs = [x0]; (gaps || []).forEach(function (g) { xs.push(g[0], g[1]); }); xs.push(x1);
+      for (var q = 0; q < xs.length; q += 2) if (xs[q + 1] - xs[q] > 0.02) box(G, xs[q], xs[q + 1], 0, We, z - 0.08, z + 0.08, M('plaster'));
+      (gaps || []).forEach(function (g) { box(G, g[0], g[1], 2.15, We, z - 0.08, z + 0.08, M('plaster')); });
+    }
+    // floors: garage + utility at house level, gym sunk
+    box(G, WX0, WX1, -BASE - 0.05, 0, GZ, 0, MAT.slab, { cast: false });
+    box(G, WX0, WX1, GF - 0.1, GF, WZ, GZ, [MAT.slab, MAT.slab, M('floor', wwid, GZ - WZ), MAT.slab, MAT.slab, MAT.slab], { cast: false });
+    // outer walls: solid along the garage, glass around the gym on the courtyard side and the far end
+    wingWall(WX0, WX0 + WT, GZ, 0, 1);
+    wingGlassX(WX0 + 0.12, WZ + 0.12, GZ, 3);
+    wingGlassZ(WZ + 0.12, WX0 + 0.12, WX1 - WT, 4);
+    wingWall(WX1 - WT, WX1, WZ, 0, 0);
+    plinth(WX0 - PP, WX0, GZ, -PP);
+    plinth(WX1, WX1 + PP, WZ, -13.1); plinth(WX1, WX1 + PP, -7.4, -PP);
+    // partitions
+    partZ(GZ, WX0 + WT, WX1 - WT, [[24.4, 25.6]]);                      // garage | gym, with steps down
+    partZ(UZ, UX0, WX1 - WT, [[23.0, 24.0]]);                          // utility room | garage
+    box(G, UX0 - 0.08, UX0 + 0.08, 0, We, UZ, 0, M('plaster'));
+    [[-0.15, 0.3], [-0.3, 0.6], [GF, 0.9]].forEach(function (st, q) {   // three steps down into the gym
+      box(G, 24.4, 25.6, GF, st[0], GZ - st[1], GZ - st[1] + 0.3, MAT.woodLt);
+    });
+
     // roof balcony: deck, glass balustrade, a couple of loungers
-    box(roofG, WX0, WX1, We, h2, WZ, 0, [MAT.woodDk, MAT.woodDk, M('deck', wwid, wlen), M('ceil'), MAT.woodDk, MAT.woodDk]);
+    box(roofG, WX0, WX1, We, h2, WZ, 0, [MAT.woodDk, MAT.woodDk, M('deck', wwid, -WZ), M('ceil'), MAT.woodDk, MAT.woodDk]);
     railX(roofG, WX0 + 0.03, WZ, -TD); railZ(roofG, WZ + 0.03, WX0, WX1); railX(roofG, WX1 - 0.03, WZ, 0);
     [-11.6, -10.4].forEach(function (lz) { box(roofG, WX0 + 2, WX0 + 4, h2, h2 + 0.32, lz - 0.35, lz + 0.35, MAT.white); });
     box(roofG, WX0 + 5.6, WX0 + 7.6, h2 + 0.68, h2 + 0.74, -5.4, -4.4, MAT.woodLt);
     person(roofG, WX0 + 6, h2, -8.2);
+
     // garage: double door facing the entrance side, two cars, workbench with tool wall, bikes, ski cabinets
     box(G, WX1 - 0.02, WX1 + 0.05, 0, 2.4, -13, -7.5, MAT.woodDk);
     [[-12.6, -10.8], [-9.8, -8.0]].forEach(function (c) {
       box(G, 28.8 + o, 33.3 + o, 0.25, 0.95, c[0], c[1], MAT.car); box(G, 29.9 + o, 32.3 + o, 0.95, 1.45, c[0] + 0.1, c[1] - 0.1, MAT.car);
     });
     box(G, WX0 + WT, WX0 + WT + 0.8, 0, 0.92, -13.6, -8.4, MAT.woodLt);
-    box(G, WX0 + WT + 0.8, 27.6 + o, 0, 0.92, WZ + WT, WZ + WT + 0.8, MAT.woodLt);
+    box(G, WX0 + WT + 0.8, 23.1, 0, 0.92, GZ + 0.08, GZ + 0.88, MAT.woodLt);
     box(G, WX0 + WT + 0.01, WX0 + WT + 0.06, 1.1, 2.3, -13.4, -8.6, MAT.dark, { cast: false });
-    [-6.2, -5.1].forEach(function (bz) { box(G, 25.0 + o, 27.0 + o, 0, 1.05, bz - 0.18, bz + 0.18, MAT.dark); });
-    [-3.7, -3.2, -2.7].forEach(function (bz) { box(G, 25.0 + o, 26.7 + o, 0, 1.0, bz - 0.05, bz + 0.05, MAT.frame, { edges: false }); });
-    box(G, 30.6 + o, 33.6 + o, 0, 2.2, -0.75, -0.05, MAT.woodLt);
+    [-6.9, -5.8].forEach(function (bz) { box(G, 20.5, 22.5, 0, 1.05, bz - 0.18, bz + 0.18, MAT.dark); });
+    [-4.4, -3.9, -3.4, -2.9].forEach(function (bz) { box(G, 20.5, 22.2, 0, 1.0, bz - 0.05, bz + 0.05, MAT.frame, { edges: false }); });
+    box(G, 24.4, 27.6, 0, 2.2, UZ - 0.68, UZ - 0.08, MAT.woodLt);                   // ski + gear cabinets on the utility wall
+
+    // laundry + technical room (entered from the wardrobe, door into the garage)
+    box(G, 25.7, 26.3, 0, 0.85, -0.68, -0.08, MAT.white); box(G, 26.35, 26.95, 0, 0.85, -0.68, -0.08, MAT.white);   // washer, dryer
+    box(G, 25.6, 28.1, 0.85, 0.89, -0.72, -0.05, MAT.stone, { edges: false });                                      // folding counter
+    box(G, 27.0, 28.1, 0, 0.85, -0.68, -0.08, MAT.woodLt);                                                         // utility sink unit
+    box(G, 22.6, 22.7, 1.4, 2.2, -2.6, -0.6, MAT.frame, { edges: false });                                         // drying rail
+    var tank = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 1.9, 20), MAT.white);
+    tank.position.set(28.7, 0.95, -1.0); tank.castShadow = true; G.add(tank);                                       // hot water tank
+    box(G, 28.25, 29.15, 0, 0.9, -2.5, -1.7, MAT.white);                                                           // heat pump indoor unit
+    box(G, 29.0, 29.18, 0.2, 1.4, -3.15, -2.65, MAT.dark);                                                        // home battery
+    box(G, 29.05, 29.18, 1.6, 2.1, -3.1, -2.7, MAT.steel);                                                        // solar inverter
+    box(G, WX1 + 0.3, WX1 + 1.0, -BASE, 0.75, -2.7, -1.6, MAT.steel);                                             // heat pump outdoor unit
+
+    // gym: lifting platform with rack, bench, dumbbells, rower, mirror on the solid wall
+    box(G, 24.6, 27.6, GF, GF + 0.03, -19.2, -16.2, MAT.rubber, { cast: false, edges: false });
+    [[25.4, -18.4], [26.8, -18.4], [25.4, -17.0], [26.8, -17.0]].forEach(function (q) { box(G, q[0] - 0.04, q[0] + 0.04, GF, GF + 2.3, q[1] - 0.04, q[1] + 0.04, MAT.steel, { edges: false }); });
+    box(G, 25.36, 26.84, GF + 2.26, GF + 2.32, -18.44, -18.36, MAT.steel, { edges: false }); box(G, 25.36, 26.84, GF + 2.26, GF + 2.32, -17.04, -16.96, MAT.steel, { edges: false });
+    box(G, 24.9, 27.3, GF + 1.35, GF + 1.38, -17.72, -17.68, MAT.steel, { edges: false });                          // barbell
+    box(G, 25.8, 26.4, GF, GF + 0.45, -16.4, -15.2, MAT.dark);                                                     // bench
+    box(G, 28.6, 29.15, GF, GF + 0.8, -19.0, -16.8, MAT.dark);                                                     // dumbbell rack
+    box(G, 21.0, 21.5, GF, GF + 0.35, -19.0, -16.6, MAT.steel);                                                    // rower
+    box(G, 29.17, 29.2, GF + 0.3, GF + 2.4, -18.5, -15.0, MAT.rug, { edges: false, cast: false });                // mirror
+    person(G, 23.0, GF, -16.0);
+
     // main entrance on the far end, with a small canopy, and a forecourt in front of both doors
     box(G, L - 0.02, L + 0.05, 0, 2.3, W / 2 + 0.9, W / 2 + 2.1, MAT.woodDk);
     box(G, L, L + 1.5, 2.5, 2.6, W / 2 + 0.3, W / 2 + 2.7, MAT.frame);
@@ -721,14 +782,15 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
     tag('Main entrance', L + 0.5, B + 3.1, W / 2 + 1.5);
     tag('Garage door', WX1 + 0.5, B + 2.9, -10.2);
     tag('2 cars', 31 + o, B + 1.9, -10.3); tag('Workbench', 25.4 + o, B + 1.5, -11);
-    tag('Dirt bikes + bikes', 26 + o, B + 1.6, -4.4); tag('Ski gear', 32 + o, B + 2.4, -0.9);
+    tag('Dirt bikes + bikes', 26 + o, B + 1.6, -4.4); tag('Ski gear', 26, B + 2.5, UZ - 0.4);
+    tag('Laundry + technical', 25.6, B + 1.4, -1.7); tag('Gym', 24.6, B + GF + 2.6, -17.5);
     tag('Stairs down', -TD + 0.7, B + h2 * 0.5 + 1.6, W / 2 + 2.2, '', 'upt');
     tag('Terrace', 15, B + 0.5, -2.0);
     tag('Sunset terrace', 4, B + 0.5, W + 2.0);
     tag('Upper terrace', 12, B + h2 + 0.6, -2.0, '', 'upt');
     tag('Stairs to garden', WX0 - 0.7, B + h2 * 0.5 + 1.6, -TD - 2.2, '', 'upt');
     tag('Roof balcony', (WX0 + WX1) / 2, B + h2 + 0.9, WZ / 2 - 1, '', 'roof');
-    tag('Garage + workshop', (WX0 + WX1) / 2 + 2, B + 1.9, -5.5);
+    tag('Garage + workshop', (WX0 + WX1) / 2 + 1.5, B + 1.9, -6.2);
     tag('Glass wall + glass roof', 4, B + roofY(W * 0.8) + 1.0, W * 0.82, '', 'roof');
     tag('Solar', 18, B + roofY(W * 0.82) + 1.1, W * 0.86, '', 'roof');
     tag('N', -7.7, 0.3, 17.5, 'dim');
@@ -749,7 +811,7 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
     tick = 0;
 
     document.getElementById('readout').textContent =
-      'Ridge ' + Hr.toFixed(1) + ' m. Hall under glass 8 × ' + W.toFixed(1) + ' m. Main bar ' + L + ' m, wing 10 × 14 m.';
+      'Ridge ' + Hr.toFixed(1) + ' m. Hall under glass 8 × ' + W.toFixed(1) + ' m. Main bar ' + L + ' m, wing 10 × 20 m.';
   }
 
   /* ---------- views ---------- */
@@ -757,11 +819,11 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
     var B = BASE, g = geo, mid = g.Hr * 0.4;
     switch (name) {
       case 'layout':  return { pos: [-12, 42, 37], tgt: [13.5, 1, -1], roof: false, xray: true, fit: true };
-      case 'plan':    return { pos: [L / 2 - 3, 82, -2.3], tgt: [L / 2 - 3, 0, -3], roof: false, xray: false, fit: true };
+      case 'plan':    return { pos: [L / 2 - 3, 90, -4.8], tgt: [L / 2 - 3, 0, -5.5], roof: false, xray: false, fit: true };
       case 'sofa':    return { pos: [6.9, B + 1.15, W / 2], tgt: [3.2, B + 3.0, W / 2 + 2.2], roof: true, xray: false, fov: 72 };
       case 'balcony': return { pos: [12.3, B + g.h2 + 1.62, g.zb + 0.4], tgt: [6, B + 2.2, W / 2], roof: true, xray: false, fov: 66 };
-      case 'terrace': return { pos: [-17, 17, -44], tgt: [16, 2.5, -3], roof: true, xray: false, fit: true };
-      case 'entrance': return { pos: [L + 30, 13, -26], tgt: [L - 7, 2, -3], roof: true, xray: false, fit: true };
+      case 'terrace': return { pos: [-19, 18, -50], tgt: [16, 2.5, -5], roof: true, xray: false, fit: true };
+      case 'entrance': return { pos: [L + 31, 14, -32], tgt: [L - 7, 2, -5], roof: true, xray: false, fit: true };
       default:        return { pos: [-22, g.Hr + 10, 33], tgt: [9, 2.5, 3], roof: true, xray: false, fit: true };
     }
   }

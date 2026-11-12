@@ -57,7 +57,23 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
 #fail{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font-size:15px}
 #fail[hidden]{display:none}
 
+button.view.walk{border-color:var(--ink);color:var(--ink);font-weight:600}
+button.view.walk[aria-pressed="true"]{color:#fff}
+#walkhud{position:absolute;left:304px;right:16px;bottom:16px;width:fit-content;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;background:var(--card);border:1px solid var(--grid);border-radius:10px;padding:8px 10px 8px 14px;box-shadow:0 6px 24px rgba(47,50,54,.10)}
+#walkhud[hidden]{display:none}
+#walkhud p{margin:0;font-size:13px;color:var(--graphite)}
+#walkhud kbd{font-family:var(--body);font-size:11.5px;font-weight:600;border:1px solid var(--grid);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:#fff}
+#walk-exit{font:inherit;font-size:13px;font-weight:600;color:#fff;background:var(--ink);border:0;border-radius:6px;padding:7px 12px;cursor:pointer}
+#walk-exit:focus-visible,.pad button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.pad{display:none;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);gap:4px}
+.pad button{font:inherit;font-size:18px;color:var(--graphite);background:#fff;border:1px solid var(--grid);border-radius:8px;touch-action:none;user-select:none;-webkit-user-select:none}
+.pad .up{grid-column:2;grid-row:1}.pad .lt{grid-column:1;grid-row:2}.pad .dn{grid-column:2;grid-row:2}.pad .rt{grid-column:3;grid-row:2}
+@media (pointer:coarse){.pad{display:grid}#walkhud .keys{display:none}}
+body.walking #stage canvas{cursor:grab}
+body.walking.dragging #stage canvas{cursor:grabbing}
 @media (max-width:640px){
+  body.walking #card{display:none}
+  #walkhud{left:8px;right:8px;bottom:8px}
   #card{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:46%;padding:10px 12px 8px;gap:8px}
   #card h1{font-size:18px}
   .views{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
@@ -75,7 +91,7 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
   <section id="card" aria-label="Model controls">
     <header>
       <h1>Glass barn house</h1>
-      <p class="sub">Layout sketch v12. One grid square is 1 m.</p>
+      <p class="sub">Layout sketch v13. One grid square is 1 m.</p>
     </header>
 
     <div>
@@ -88,6 +104,7 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
         <button class="view" type="button" data-view="balcony" aria-pressed="false">From the balcony</button>
         <button class="view" type="button" data-view="terrace" aria-pressed="false">Terrace side</button>
         <button class="view" type="button" data-view="entrance" aria-pressed="false">Entrance side</button>
+        <button class="view walk" type="button" data-view="walk" aria-pressed="false">Walk around</button>
       </div>
     </div>
 
@@ -125,6 +142,17 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
     <p class="hint">Drag to orbit, scroll to zoom, right-drag to pan. The blue figures are 1.8 m tall.</p>
   </section>
 
+  <div id="walkhud" hidden>
+    <p><span class="keys">Drag to look around. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to walk, <kbd>Shift</kbd> to run. </span>Click or tap the floor to walk there.</p>
+    <div class="pad" role="group" aria-label="Walk controls">
+      <button type="button" class="up" data-k="f" aria-label="Walk forward">↑</button>
+      <button type="button" class="lt" data-k="tl" aria-label="Turn left">↺</button>
+      <button type="button" class="dn" data-k="b" aria-label="Walk back">↓</button>
+      <button type="button" class="rt" data-k="tr" aria-label="Turn right">↻</button>
+    </div>
+    <button type="button" id="walk-exit">Exit walk</button>
+  </div>
+
   <div id="fail" hidden>The 3D library did not load, so the model cannot be shown. Reload the page to try again.</div>
 </div>
 
@@ -148,6 +176,7 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
   var WT = 0.3;     // wall thickness
   var ST_X0 = 11, ST_X1 = 13, ST_ZB = 6, ST_ZT = 1.1; // stairs: bottom at z=6, landing from z=1.1 to the wall
 
+  var groundMesh = null;
   var P = { eave: 6, pitch: 30, floor2: 3.0, width: 9.5 };
   var state = { roof: true, up: true, upt: true, xray: false, labels: true };
 
@@ -401,6 +430,7 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
   (function ground() {
     var t = TEX.paper.clone(); t.repeat.set(96, 96); t.needsUpdate = true;
     var m = new THREE.Mesh(new THREE.PlaneGeometry(480, 480), new THREE.MeshLambertMaterial({ map: t }));
+    groundMesh = m;
     m.rotation.x = -Math.PI / 2; m.position.set(L / 2, 0, W / 2); m.receiveShadow = true; scene.add(m);
     // north arrow drawn on the paper (north = towards the TV gable, -x)
     var a = [[-3, 0.03, 17.5], [-7, 0.03, 17.5]], hd = [[-6.2, 0.03, 17], [-7, 0.03, 17.5], [-6.2, 0.03, 18]];
@@ -539,7 +569,7 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
     var FW = 0.95, FS = h2 + 0.45, FH = Math.min(h2 + 2.45, He - 0.25);            // front bedroom windows: width, sill, head
     var fwin = [[W / 2 - 2.25, W / 2 - 2.25 + FW], [W / 2 + 2.25 - FW, W / 2 + 2.25]];
     gable(G, [[0, -BASE], [W, -BASE], [W, He], [W / 2, Hr], [0, He]], L - WT, WT, M('clad'),
-      fwin.map(function (f) { return [f[0], f[1], FS, FH]; }));
+      fwin.map(function (f) { return [f[0], f[1], FS, FH]; }).concat([[W / 2 + 0.9, W / 2 + 2.1, 0, 2.3]]));
     fwin.forEach(function (f) {
       box(G, L - 0.17, L - 0.13, FS, FH, f[0], f[1], MAT.glass);
       box(G, L - 0.26, L - 0.04, FS, FS + 0.08, f[0], f[1], MAT.frame, { edges: false });
@@ -659,7 +689,7 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
     person(G, 23.0, GF, -16.0);
 
     // main entrance on the far end, with a small canopy, and a forecourt in front of both doors
-    box(G, L - 0.02, L + 0.05, 0, 2.3, W / 2 + 0.9, W / 2 + 2.1, MAT.woodDk);
+    box(G, L - WT - 1.1, L - WT, 0, 2.3, W / 2 + 0.92, W / 2 + 0.98, MAT.woodDk);           // front door, standing open
     box(G, L, L + 1.5, 2.5, 2.6, W / 2 + 0.3, W / 2 + 2.7, MAT.frame);
     box(G, L, L + 9, -BASE - 0.02, -BASE + 0.04, WZ, W, MAT.gravel, { cast: false });
 
@@ -706,8 +736,8 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
     slab(ST_X1, L - WT, WT, W - WT);            // main deck
     slab(ST_X0, ST_X1, WT, ST_ZT);              // landing at the top of the stairs
     slab(ST_X0, ST_X1, ST_ZB, W - WT);          // balcony nook over the living room
-    function railX(par, x, z0, z1) { box(par, x - 0.02, x + 0.02, h2, h2 + 1.0, z0, z1, MAT.glass); box(par, x - 0.04, x + 0.04, h2 + 1.0, h2 + 1.06, z0, z1, MAT.frame, { edges: false }); }
-    function railZ(par, z, x0, x1) { box(par, x0, x1, h2, h2 + 1.0, z - 0.02, z + 0.02, MAT.glass); box(par, x0, x1, h2 + 1.0, h2 + 1.06, z - 0.04, z + 0.04, MAT.frame, { edges: false }); }
+    function railX(par, x, z0, z1) { box(par, x - 0.02, x + 0.02, h2, h2 + 1.0, z0, z1, MAT.glass).userData.rail = true; box(par, x - 0.04, x + 0.04, h2 + 1.0, h2 + 1.06, z0, z1, MAT.frame, { edges: false }); }
+    function railZ(par, z, x0, x1) { box(par, x0, x1, h2, h2 + 1.0, z - 0.02, z + 0.02, MAT.glass).userData.rail = true; box(par, x0, x1, h2 + 1.0, h2 + 1.06, z - 0.04, z + 0.04, MAT.frame, { edges: false }); }
     railX(upG, ST_X0 + 0.02, WT, ST_ZT); railX(upG, ST_X0 + 0.02, ST_ZB, W - WT);       // edge over the living room
     railX(upG, ST_X1, ST_ZT, ST_ZB); railZ(upG, ST_ZB, ST_X0, ST_X1);                   // around the stair opening
     // cushion chairs on the balcony
@@ -841,6 +871,7 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
     tag('wall ' + He.toFixed(1) + ' m', -0.3, B + He + 0.5, W + 0.3, 'dim');
     tag('ridge ' + Hr.toFixed(1) + ' m', -0.4, B + Hr + 0.7, W / 2, 'dim');
 
+    walk.dirty = true;
     occluders = [];
     house.updateMatrixWorld(true);
     house.traverse(function (o) {
@@ -854,6 +885,142 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
     document.getElementById('readout').textContent =
       'Ridge ' + Hr.toFixed(1) + ' m. Hall under glass 8 × ' + W.toFixed(1) + ' m. Main bar ' + L + ' m, wing 10 × 20 m.';
   }
+
+  /* ---------- walk mode: first person, Street View style ---------- */
+  var EYE = 1.65, STEP = 0.36, RAD = 0.3;
+  var walk = { on: false, x: 0, z: 0, feet: 0, yaw: 0, pitch: 0, keys: {}, target: null, dirty: true, solid: [], floor: [] };
+  var wRay = new THREE.Raycaster(), wO = new THREE.Vector3(), wD = new THREE.Vector3(), DOWN = new THREE.Vector3(0, -1, 0), wN = new THREE.Vector2();
+  var marker = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.3, 36), new THREE.MeshBasicMaterial({ color: 0x2a55a6, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
+  marker.rotation.x = -Math.PI / 2; marker.visible = false; marker.renderOrder = 5; scene.add(marker);
+  var hud = document.getElementById('walkhud');
+  function shown(o) { for (var a = o; a; a = a.parent) if (!a.visible) return false; return true; }
+  function walkLists() {                    // what you can stand on, and what stops you (glass walls act as open doors; balustrades do not)
+    if (!walk.dirty) return;
+    walk.solid = []; walk.floor = [groundMesh];
+    house.updateMatrixWorld(true);
+    house.traverse(function (o) {
+      if (!o.isMesh || o.material === MAT.ink || !shown(o)) return;
+      if (o.material === MAT.glass) { if (o.userData.rail) walk.solid.push(o); return; }
+      walk.solid.push(o); walk.floor.push(o);
+    });
+    walk.dirty = false;
+  }
+  function floorAt(x, z, fromY) {
+    wRay.set(wO.set(x, fromY, z), DOWN); wRay.near = 0; wRay.far = 80;
+    var h = wRay.intersectObjects(walk.floor, false);
+    return h.length ? h[0].point.y : null;
+  }
+  function blocked(x, z, feet, dx, dz, dist) {
+    for (var i = 0; i < 2; i++) {
+      wRay.set(wO.set(x, feet + (i ? 1.2 : 0.45), z), wD.set(dx, 0, dz)); wRay.near = 0; wRay.far = dist + RAD;
+      if (wRay.intersectObjects(walk.solid, false).length) return true;
+    }
+    return false;
+  }
+  function tryMove(mx, mz) {
+    function go(ax, az) {
+      var d = Math.sqrt(ax * ax + az * az); if (d < 1e-6) return false;
+      if (blocked(walk.x, walk.z, walk.feet, ax / d, az / d, d)) return false;
+      var f = floorAt(walk.x + ax, walk.z + az, walk.feet + STEP);
+      if (f === null || f - walk.feet > STEP) return false;
+      walk.x += ax; walk.z += az; return true;
+    }
+    return go(mx, mz) || go(mx, 0) || go(0, mz);       // slide along walls
+  }
+  function walkStep(dt) {
+    walkLists();
+    var k = walk.keys, sp = (k.run ? 4.2 : 1.8) * dt;
+    if (k.tl) walk.yaw += 1.9 * dt;
+    if (k.tr) walk.yaw -= 1.9 * dt;
+    var fx = -Math.sin(walk.yaw), fz = -Math.cos(walk.yaw), rx = -fz, rz = fx;
+    var mx = 0, mz = 0;
+    if (k.f) { mx += fx; mz += fz; }
+    if (k.b) { mx -= fx; mz -= fz; }
+    if (k.r) { mx += rx; mz += rz; }
+    if (k.l) { mx -= rx; mz -= rz; }
+    var ml = Math.sqrt(mx * mx + mz * mz);
+    if (ml > 0) tryMove(mx / ml * sp, mz / ml * sp);
+    else if (walk.target) {
+      var tx = walk.target.x - walk.x, tz = walk.target.z - walk.z, td = Math.sqrt(tx * tx + tz * tz);
+      if (td < 0.12) { walk.target = null; marker.visible = false; }
+      else { var st = Math.min(td, 2.6 * dt); if (!tryMove(tx / td * st, tz / td * st)) { walk.target = null; marker.visible = false; } }
+    }
+    var f = floorAt(walk.x, walk.z, walk.feet + STEP);
+    if (f !== null) walk.feet += (f - walk.feet) * Math.min(1, dt * 14);
+    camera.position.set(walk.x, walk.feet + EYE, walk.z);
+    camera.rotation.set(walk.pitch, walk.yaw, 0, 'YXZ');
+  }
+  function pickFloor(cx, cy) {
+    var r = renderer.domElement.getBoundingClientRect();
+    wN.set((cx - r.left) / r.width * 2 - 1, -(cy - r.top) / r.height * 2 + 1);
+    wRay.setFromCamera(wN, camera); wRay.near = 0.1; wRay.far = 60;
+    var h = wRay.intersectObjects(walk.floor, false)[0];
+    if (!h || !h.face) return null;
+    var n = h.face.normal.clone().transformDirection(h.object.matrixWorld);
+    return n.y > 0.6 ? h.point : null;
+  }
+  function enterWalk() {
+    walk.on = true; tween = null; controls.enabled = false; walk.keys = {}; walk.target = null;
+    setToggle('roof', true); setToggle('xray', false);
+    walk.dirty = true; walkLists();
+    walk.x = 2.6; walk.z = W + 2.6;                       // on the sunset terrace, facing the glass corner
+    var f = floorAt(walk.x, walk.z, 2.5); walk.feet = f === null ? 0 : f;
+    walk.yaw = Math.atan2(-0.42, 0.9); walk.pitch = 0.06;
+    camera.fov = 72; camera.updateProjectionMatrix();
+    hud.hidden = false; document.body.classList.add('walking');
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+  function exitWalk() {
+    walk.on = false; walk.keys = {}; walk.target = null; marker.visible = false;
+    controls.enabled = true; hud.hidden = true; document.body.classList.remove('walking', 'dragging');
+  }
+  var KEYS = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', KeyD: 'r', ArrowLeft: 'tl', ArrowRight: 'tr', ShiftLeft: 'run', ShiftRight: 'run' };
+  window.addEventListener('keydown', function (e) {
+    if (!walk.on) return;
+    if (e.key === 'Escape') { goTo('sketch'); return; }
+    var k = KEYS[e.code];
+    if (k && !(e.target && e.target.tagName === 'INPUT')) { walk.keys[k] = true; walk.target = null; marker.visible = false; e.preventDefault(); }
+  });
+  window.addEventListener('keyup', function (e) { var k = KEYS[e.code]; if (k) walk.keys[k] = false; });
+  window.addEventListener('blur', function () { walk.keys = {}; });
+  var dom = renderer.domElement, drag = null;
+  dom.addEventListener('pointerdown', function (e) {
+    if (!walk.on) return;
+    drag = { lx: e.clientX, ly: e.clientY, moved: 0 };
+    try { dom.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  dom.addEventListener('pointermove', function (e) {
+    if (!walk.on) return;
+    if (drag) {
+      var dx = e.clientX - drag.lx, dy = e.clientY - drag.ly; drag.lx = e.clientX; drag.ly = e.clientY;
+      drag.moved += Math.abs(dx) + Math.abs(dy);
+      if (drag.moved > 5) {
+        document.body.classList.add('dragging');
+        walk.yaw += dx * 0.0035; walk.pitch = Math.max(-1.35, Math.min(1.35, walk.pitch + dy * 0.0035));
+      }
+    } else if (e.pointerType === 'mouse' && !walk.target) {
+      walkLists();
+      var p = pickFloor(e.clientX, e.clientY);
+      marker.visible = !!p; if (p) marker.position.set(p.x, p.y + 0.02, p.z);
+    }
+  });
+  function endDrag(e) {
+    if (!walk.on || !drag) return;
+    if (drag.moved <= 5) {
+      walkLists();
+      var p = pickFloor(e.clientX, e.clientY);
+      if (p) { walk.target = p.clone(); marker.position.set(p.x, p.y + 0.02, p.z); marker.visible = true; }
+    }
+    drag = null; document.body.classList.remove('dragging');
+  }
+  dom.addEventListener('pointerup', endDrag);
+  dom.addEventListener('pointercancel', function () { drag = null; document.body.classList.remove('dragging'); });
+  document.querySelectorAll('.pad button').forEach(function (b) {
+    var k = b.dataset.k;
+    b.addEventListener('pointerdown', function (e) { e.preventDefault(); walk.keys[k] = true; walk.target = null; marker.visible = false; });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { b.addEventListener(ev, function () { walk.keys[k] = false; }); });
+  });
+  document.getElementById('walk-exit').addEventListener('click', function () { goTo('sketch'); });
 
   /* ---------- views ---------- */
   function viewDef(name) {
@@ -870,6 +1037,9 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
   }
   var tween = null, currentView = 'sketch';
   function goTo(name, instant) {
+    document.querySelectorAll('button.view').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.view === name ? 'true' : 'false'); });
+    if (name === 'walk') { enterWalk(); return; }
+    if (walk.on) exitWalk();
     var d = viewDef(name); currentView = name;
     var tgt = new THREE.Vector3().fromArray(d.tgt), pos = new THREE.Vector3().fromArray(d.pos);
     if (d.fit) { var k = Math.max(1, 1.05 / camera.aspect); pos.sub(tgt).multiplyScalar(k).add(tgt); }
@@ -886,6 +1056,7 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
 
   /* ---------- controls ---------- */
   function setToggle(key, on) {
+    walk.dirty = true;
     state[key] = on; document.getElementById('t-' + key).checked = on;
     if (key === 'roof' && roofG) roofG.visible = on;
     if (key === 'up' && upG) upG.visible = on;
@@ -921,7 +1092,14 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
   if (window.matchMedia('(max-width:640px)').matches) document.getElementById('props').open = false;
 
+  var lastT = 0;
   function frame(now) {
+    var dt = Math.min(0.1, lastT ? (now - lastT) / 1000 : 0); lastT = now;
+    if (walk.on) {
+      walkStep(dt);
+      renderer.render(scene, camera); updateLabels();
+      requestAnimationFrame(frame); return;
+    }
     if (tween) {
       var f = Math.min(1, (now - tween.t0) / tween.dur), e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
       camera.position.lerpVectors(tween.p0, tween.p1, e); controls.target.lerpVectors(tween.q0, tween.q1, e);

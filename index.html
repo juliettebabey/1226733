@@ -54,6 +54,14 @@ summary{cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.08em;text-
 .slider input{grid-column:1 / -1;width:100%;accent-color:var(--ink);margin:0}
 .readout{margin:0;font-size:12.5px;color:var(--graphite-soft);font-variant-numeric:tabular-nums}
 .hint{margin:0;font-size:12px;color:var(--graphite-soft)}
+.costbox{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.costbox .big{margin:0;font-family:var(--display);font-size:24px;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums}
+#c-rows{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+#c-rows td{padding:2px 0;border-top:1px solid var(--grid)}
+#c-rows td:last-child{text-align:right;font-weight:600;color:var(--ink);white-space:nowrap;padding-left:8px}
+#c-rows tr.sum td{border-top:1.5px solid var(--graphite-soft);font-weight:600}
+.costbox .land{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;margin-top:4px}
+.costbox .land input{width:76px;font:inherit;font-size:12.5px;padding:3px 6px;border:1px solid var(--grid);border-radius:6px;background:#fff;color:var(--ink)}
 #fail{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font-size:15px}
 #fail[hidden]{display:none}
 
@@ -68,6 +76,8 @@ button.view.walk[aria-pressed="true"]{color:#fff}
 .pad{display:none;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);gap:4px}
 .pad button{font:inherit;font-size:18px;color:var(--graphite);background:#fff;border:1px solid var(--grid);border-radius:8px;touch-action:none;user-select:none;-webkit-user-select:none}
 .pad .up{grid-column:2;grid-row:1}.pad .lt{grid-column:1;grid-row:2}.pad .dn{grid-column:2;grid-row:2}.pad .rt{grid-column:3;grid-row:2}
+#walk-fovl{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--graphite)}
+#walk-fovl input{width:84px;accent-color:var(--ink)}
 #walk-aim{font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--ink);border-radius:6px;padding:6px 11px;cursor:pointer}
 #walk-aim:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 #walkhud .locked-text,#walkhud .aim-note{display:none}
@@ -102,7 +112,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   <section id="card" aria-label="Model controls">
     <header>
       <h1>Glass barn house</h1>
-      <p class="sub">Layout sketch v22. One grid square is 1 m.</p>
+      <p class="sub">Layout sketch v25. One grid square is 1 m.</p>
     </header>
 
     <div>
@@ -133,6 +143,10 @@ body.walking.dragging #stage canvas{cursor:grabbing}
       <summary>Proportions</summary>
       <div class="sliders">
         <div class="slider">
+          <label for="s-scale">Overall scale</label><output id="o-scale" for="s-scale">100%</output>
+          <input type="range" id="s-scale" min="60" max="130" step="5" value="100">
+        </div>
+        <div class="slider">
           <label for="s-eave">Wall height</label><output id="o-eave" for="s-eave">6.0 m</output>
           <input type="range" id="s-eave" min="4.5" max="9" step="0.5" value="6">
         </div>
@@ -152,12 +166,25 @@ body.walking.dragging #stage canvas{cursor:grabbing}
       </div>
     </details>
 
+    <details id="cost" open>
+      <summary>Rough cost</summary>
+      <div class="costbox">
+        <p class="big" id="c-total"></p>
+        <p class="readout" id="c-range"></p>
+        <table id="c-rows"></table>
+        <div class="land"><label for="c-land">Land, PLN per m²</label><input type="number" id="c-land" min="0" max="5000" step="50" value="400"></div>
+        <p class="readout" id="c-landout"></p>
+        <p class="readout" id="c-note"></p>
+      </div>
+    </details>
+
     <p class="hint">Drag to orbit, scroll to zoom, right-drag to pan.</p>
   </section>
 
   <div id="crosshair" aria-hidden="true"></div>
   <div id="walkhud" hidden>
     <p><span class="free-text"><span class="keys">Drag to look around. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to walk, <kbd>Shift</kbd> to run. </span>Click or tap the floor to walk there.</span><span class="locked-text">Mouse aims. <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to walk, <kbd>Shift</kbd> to run, click to walk to the crosshair. <kbd>Esc</kbd> frees the mouse.</span></p>
+    <label id="walk-fovl">View <input type="range" id="walk-fov" min="35" max="85" step="1" value="55" aria-label="Field of view"></label>
     <button type="button" id="walk-aim">Mouse aim (FPS)</button>
     <div class="pad" role="group" aria-label="Walk controls">
       <button type="button" class="up" data-k="f" aria-label="Walk forward">↑</button>
@@ -205,6 +232,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
 
   var groundMesh = null;
   var P = { eave: 6, pitch: 30, floor2: 3.0, width: 9.5 };
+  var SCALE = 1;      // whole house and plot, uniform; the grid and the walker stay at real size
   var state = { roof: true, up: true, upt: true, rooms: true, xray: false, labels: true };
 
   var stage = document.getElementById('stage');
@@ -438,7 +466,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
       return (!o.roof || state.roof) && (!o.up || state.up) && (!o.upt || state.upt) && (!o.rooms || state.rooms) && !(o.solid && state.xray);
     }).map(function (o) { return o.mesh; });
     labels.forEach(function (l) {
-      dir.copy(l.pos).sub(camera.position); var d = dir.length(); dir.normalize();
+      dir.copy(l.pos).multiplyScalar(SCALE).sub(camera.position); var d = dir.length(); dir.normalize();
       ray.set(camera.position, dir); ray.near = 0.05; ray.far = d - 0.12;
       l.hidden = d > 0.2 && ray.intersectObjects(active, false).length > 0;
     });
@@ -451,10 +479,10 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     for (var i = 0; i < labels.length; i++) {
       var l = labels[i], show = state.labels && !l.hidden && (l.only !== 'roof' || state.roof) && (l.only !== 'up' || state.up) && (l.only !== 'upt' || state.upt);
       if (show) {
-        tmp.copy(l.pos).applyMatrix4(camera.matrixWorldInverse);
+        tmp.copy(l.pos).multiplyScalar(SCALE).applyMatrix4(camera.matrixWorldInverse);
         show = tmp.z < -0.4;
         if (show) {
-          tmp.copy(l.pos).project(camera);
+          tmp.copy(l.pos).multiplyScalar(SCALE).project(camera);
           show = Math.abs(tmp.x) < 1.02 && Math.abs(tmp.y) < 1.02;
           if (show) l.el.style.transform = 'translate(-50%,-50%) translate(' + ((tmp.x + 1) / 2 * w).toFixed(1) + 'px,' + ((1 - tmp.y) / 2 * h).toFixed(1) + 'px)';
         }
@@ -479,7 +507,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
   function build() {
     if (house) { scene.remove(house); house.traverse(function (o) { if (o.geometry) o.geometry.dispose(); }); }
     clearMats(); clearLabels();
-    house = new THREE.Group(); scene.add(house);
+    house = new THREE.Group(); house.scale.setScalar(SCALE); scene.add(house);
     var G = new THREE.Group(); G.position.y = BASE; house.add(G);          // everything measured from floor level
     roofG = new THREE.Group(); G.add(roofG); roofG.visible = state.roof;
     upG = new THREE.Group(); G.add(upG); upG.visible = state.up;
@@ -588,7 +616,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     box(hatch, -kb / 2 + 0.04, kb / 2 - 0.04, -(KWH - KWS) + 0.06, 0, -0.02, 0.02, MAT.glass);
     box(hatch, -kb / 2 + 0.04, kb / 2 - 0.04, -(KWH - KWS) + 0.06, -(KWH - KWS) + 0.14, -0.05, 0.05, MAT.frame, { edges: false });
     westSeg(KW0, WR0, h2, He); westGlass(WR0, WR1, h2, UWH, 2); westSeg(WR0, WR1, UWH, He);
-    var UB0 = WX0 + 4.3, UB1 = WX0 + 8.1;                                      // bedroom window upstairs, clear of the en-suite
+    var UB0 = WX0 + 5.4, UB1 = WX0 + 9.2;                                      // bedroom window upstairs, moved south, clear of the office and en-suite
     westSeg(WR1, WB0, -BASE, h2); westGlass(WB0, WB1, 0, GWH, 3); westSeg(WB0, WB1, GWH, h2); westSeg(WB1, L, -BASE, h2);
     westSeg(WR1, UB0, h2, He); westGlass(UB0, UB1, h2, UWH, 3); westSeg(UB0, UB1, UWH, He); westSeg(UB1, L, h2, He);
 
@@ -616,10 +644,13 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     var RD0 = 15.9, RD1 = 18.6;                                                   // upstairs room: glass exit onto the upper terrace
     eastSeg(KD0, RD0, KDH, He); eastSeg(RD1, KD1, KDH, He);
     eastSeg(RD0, RD1, KDH, h2); eastGlass(RD0, RD1, h2, LDH, 2, [LDH - 0.06]); eastSeg(RD0, RD1, LDH, He);
-    var o = WX0 - 24, BD0 = WX0 + 1.5, BD1 = WX0 + 4.5, GD0 = 29 + o, GD1 = 30 + o;      // everything past the kitchen sits relative to the wing
-    eastSeg(KD1, BD0, -BASE, He);
-    eastSeg(BD0, BD1, -BASE, h2); eastGlass(BD0, BD1, h2, LDH, 2, [LDH - 0.06]); eastSeg(BD0, BD1, LDH, He);   // bedroom doors onto the garage-roof balcony
-    eastSeg(BD1, GD0, -BASE, He); eastSeg(GD0, GD1, 2.1, He); eastSeg(GD1, L, -BASE, He);                    // doorway from the wardrobe into the garage
+    var o = WX0 - 24, BD0 = WX0 + 6.2, BD1 = WX0 + 8.8, GD0 = 29 + o, GD1 = 30 + o;      // everything past the kitchen sits relative to the wing
+    var OW0 = WX0 + 1.1, OW1 = WX0 + 3.7, OWS = h2 + 0.9;                                  // office window above the desk
+    eastSeg(KD1, OW0, -BASE, He);
+    eastSeg(OW0, OW1, -BASE, OWS); eastGlass(OW0, OW1, OWS, LDH, 2, [LDH - 0.06]); eastSeg(OW0, OW1, LDH, He);
+    eastSeg(OW1, GD0, -BASE, He); eastSeg(GD0, GD1, 2.1, He); eastSeg(GD1, BD0, -BASE, He);                // doorway from the wardrobe into the garage
+    eastSeg(BD0, BD1, -BASE, h2); eastGlass(BD0, BD1, h2, LDH, 2, [LDH - 0.06]); eastSeg(BD0, BD1, LDH, He);   // bedroom doors onto the garage-roof balcony, moved south
+    eastSeg(BD1, L, -BASE, He);
 
     /* --- south end: closed for now, the house carries on from here --- */
     var FW = 0.95, FS = h2 + 0.45, FH = Math.min(h2 + 2.45, He - 0.25);            // front bedroom windows: width, sill, head
@@ -801,7 +832,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     });
     // rooms upstairs are only dashed outlines for now
     function zone(x0, x1, z0, z1) { var y = h2 + 0.02; polyline(upG, [[x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1], [x0, y, z0]], MAT.dash, true); }
-    zone(15.2, 19.6, 0.5, uE); zone(15.2, 19.6, uW, W - 0.5); zone(19.9, 28.9, 0.5, W - 0.5); zone(19.9, 23.7, W - 3.7, W - 0.4);
+    zone(15.2, 19.6, 0.5, uE); zone(15.2, 19.6, uW, W - 0.5); zone(24.0, 28.9, 0.5, W - 0.5); zone(19.9, 23.5, 0.5, 4.0); zone(19.9, 23.7, W - 3.7, W - 0.4);
     // en-suite: freestanding tub under the eaves side, long double vanity facing it
     var bz1 = W - WT - 0.15;
     box(upG, 20.1, 22.0, h2, h2 + 0.58, bz1 - 0.85, bz1, MAT.white);                   // bathtub 190 x 85
@@ -810,6 +841,18 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     box(upG, 21.55, 23.55, h2 + 0.85, h2 + 0.9, W - 3.68, W - 3.07, MAT.stone, { edges: false });
     [22.05, 23.05].forEach(function (sx) { box(upG, sx - 0.25, sx + 0.25, h2 + 0.9, h2 + 0.95, W - 3.55, W - 3.2, MAT.white, { edges: false }); });
     box(upG, 23.62, 23.68, h2 + 1.1, h2 + 2.0, W - 3.6, W - 3.15, MAT.rug, { edges: false, cast: false });  // mirror
+    // office: 220 cm desk under the east window, chair, bookshelf along the bedroom wall
+    box(upG, 20.8, 23.0, h2 + 0.72, h2 + 0.76, WT + 0.02, WT + 0.72, MAT.woodLt);
+    [20.8, 22.94].forEach(function (lx) { box(upG, lx, lx + 0.06, h2, h2 + 0.72, WT + 0.05, WT + 0.69, MAT.woodDk); });
+    box(upG, 21.7, 22.3, h2 + 0.95, h2 + 1.27, WT + 0.3, WT + 0.34, MAT.dark, { edges: false });          // monitor
+    box(upG, 21.97, 22.03, h2 + 0.76, h2 + 0.95, WT + 0.31, WT + 0.33, MAT.dark, { edges: false });
+    var oc = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.07, 18), MAT.dark);
+    oc.position.set(22.0, h2 + 0.47, WT + 1.35); oc.castShadow = true; upG.add(oc);                       // chair seat
+    box(upG, 21.75, 22.25, h2 + 0.5, h2 + 0.98, WT + 1.62, WT + 1.67, MAT.dark, { edges: false });          // chair back
+    box(upG, 21.97, 22.03, h2, h2 + 0.47, WT + 1.32, WT + 1.38, MAT.dark, { edges: false });
+    box(upG, 20.9, 22.9, h2, h2 + 0.015, 1.6, 3.5, MAT.rug, { edges: false, cast: false });                 // rug
+    box(upG, 23.43, 23.69, h2, h2 + 2.1, 1.0, 3.3, MAT.woodLt);                                            // bookshelf
+    [0.45, 0.9, 1.35, 1.8].forEach(function (sy) { box(upG, 23.38, 23.43, h2 + sy, h2 + sy + 0.03, 1.0, 3.3, MAT.woodDk, { edges: false }); });
     // ground floor past the kitchen: guest room, full bathroom, wardrobe + storage, entrance hall (outlines only)
     function gzone(x0, x1, z0, z1) { polyline(G, [[x0, 0.02, z0], [x1, 0.02, z0], [x1, 0.02, z1], [x0, 0.02, z1], [x0, 0.02, z0]], MAT.dash, true); }
     gzone(24.5 + o, 30.3 + o, gW, W - 0.4); gzone(24.5 + o, 27.5 + o, 0.45, gE); gzone(27.8 + o, 33.6 + o, 0.45, gE); gzone(30.6 + o, 33.6 + o, gE + 0.3, W - 0.4);
@@ -849,7 +892,10 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     wallZ(roomUpG, 15.2, zi, uE, uy0, uy1); wallZ(roomUpG, 15.2, uW, zo, uy0, uy1);
     wallX(roomUpG, uE, 15.2, RX, uy0, uy1, [[16.0, 16.9]]);
     wallX(roomUpG, uW, 15.2, RX, uy0, uy1, [[16.0, 16.9]]);
-    wallZ(roomUpG, RX, zi, zo, uy0, uy1, [[W / 2 - 0.45, W / 2 + 0.45]]);     // bedroom door at the end of the corridor
+    var OZ = 4.1;                                                              // office | short passage to the bedroom
+    wallZ(roomUpG, RX, zi, zo, uy0, uy1, [[W / 2 - 0.45, W / 2 + 0.45]]);     // door at the end of the corridor
+    wallX(roomUpG, OZ, RX, 23.75, uy0, uy1, [[20.4, 21.3]]);                  // office door off the passage
+    wallZ(roomUpG, 23.75, zi, OZ, uy0, uy1);                                  // office | bedroom
     wallX(roomUpG, W - 3.75, RX, 23.75, uy0, uy1);
     wallZ(roomUpG, 23.75, W - 3.75, zo, uy0, uy1, [[W - 2.9, W - 2.0]]);      // en-suite door from the bedroom
     // ground floor: corridor from the kitchen to the entrance hall, rooms either side
@@ -1081,7 +1127,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     tag('Kitchen doors', 16.9, B + 1.4, -0.16);
     tag('Glass wall + doors', 5.8, B + 1.5, -0.16);
     tag('Room', 17.4, B + h2 + 0.3, 2.0, 'zone', 'up'); tag('Room', 17.4, B + h2 + 0.3, W - 2.0, 'zone', 'up');
-    tag('Bedroom', 23, B + h2 + 0.3, 3.6, 'zone', 'up'); tag('Bath', 21.8, B + h2 + 1.3, W - 2.1, 'zone', 'up');
+    tag('Bedroom', 25.8, B + h2 + 0.3, 2.0, 'zone', 'up'); tag('Office', 21.9, B + h2 + 0.3, 2.3, 'zone', 'up'); tag('Bath', 21.8, B + h2 + 1.3, W - 2.1, 'zone', 'up');
     tag('King bed', 28.1, B + h2 + 1.1, W / 2, '', 'up');
     tag('Guest room', 27 + o, B + 1.2, W - 2.9, 'zone'); tag('Bathroom', 26 + o, B + 1.2, 2.0, 'zone');
     tag('Wardrobe + storage', 30.3 + o, B + 1.2, 1.3, 'zone'); tag('Entrance hall', 32.1 + o, B + 1.2, W / 2 + 1.5, 'zone');
@@ -1105,8 +1151,8 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     tag('Grasses', 24, B + 1.6, W + 0.8); tag('Birches', 25.6, B + 7.8, W + 8.2);
     tag('Orchard', 13.8, B + 3.9, W + 9.6); tag('Sauna', -4.2, B + 3.3, W + 6.3); tag('Hot tub + cold plunge', -2.5, B + 1.9, W + 10.6);
     tag('Meadow path', 4.6, B + 0.5, W + 6.5); tag('Windbreak hedge', 30, B + 3.3, W + PLOT_WP - 0.8); tag('Kept low for the view', 5, B + 1.6, W + PLOT_WP - 0.8);
-    tag('Walkway 1.5 m', 24.5, B + 0.4, PLOT_E + 0.75, 'dim');
-    tag('Plot ' + geo.plot[0].toFixed(0) + ' × ' + geo.plot[1].toFixed(0) + ' m', (PLOT_N + L + PLOT_SP) / 2, 0.3, PLOT_E - 1.4, 'dim');
+    tag('Walkway ' + (1.5 * SCALE).toFixed(1) + ' m', 24.5, B + 0.4, PLOT_E + 0.75, 'dim');
+    tag('Plot ' + (geo.plot[0] * SCALE).toFixed(0) + ' × ' + (geo.plot[1] * SCALE).toFixed(0) + ' m', (PLOT_N + L + PLOT_SP) / 2, 0.3, PLOT_E - 1.4, 'dim');
     tag('Upper terrace', 12, B + h2 + 0.6, -2.0, '', 'upt');
     tag('Stairs to garden', WX0 - 0.7, B + h2 * 0.5 + 1.6, -TD - 2.2, '', 'upt');
     tag('Roof balcony', (WX0 + WX1) / 2, B + h2 + 0.9, WZ / 2 - 1, '', 'roof');
@@ -1115,10 +1161,10 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     tag('Solar', 18, B + roofY(W * 0.82) + 1.1, W * 0.86, '', 'roof');
     tag('N', -7.7, 0.3, 17.5, 'dim');
     tag('Sunset', L / 2 - 4, 0.4, W + 15, 'dim');
-    tag(W.toFixed(1) + ' m', dx - 0.9, 0.3, W / 2, 'dim');
-    tag('8 m of glass', GL / 2, 0.3, dzl + 0.9, 'dim');
-    tag('wall ' + He.toFixed(1) + ' m', -0.3, B + He + 0.5, W + 0.3, 'dim');
-    tag('ridge ' + Hr.toFixed(1) + ' m', -0.4, B + Hr + 0.7, W / 2, 'dim');
+    tag((W * SCALE).toFixed(1) + ' m', dx - 0.9, 0.3, W / 2, 'dim');
+    tag((GL * SCALE).toFixed(0) + ' m of glass', GL / 2, 0.3, dzl + 0.9, 'dim');
+    tag('wall ' + (He * SCALE).toFixed(1) + ' m', -0.3, B + He + 0.5, W + 0.3, 'dim');
+    tag('ridge ' + (Hr * SCALE).toFixed(1) + ' m', -0.4, B + Hr + 0.7, W / 2, 'dim');
 
     walk.dirty = true;
     occluders = [];
@@ -1131,12 +1177,60 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     });
     tick = 0;
 
+    var k = SCALE, pa = geo.plot[0] * geo.plot[1] * k * k;
     document.getElementById('readout').textContent =
-      'Ridge ' + Hr.toFixed(1) + ' m. Hall under glass 8 × ' + W.toFixed(1) + ' m. Main bar ' + L + ' m, wing 10 × 20 m. Plot ' + geo.plot[0].toFixed(0) + ' × ' + geo.plot[1].toFixed(0) + ' m, about ' + (Math.round(geo.plot[0] * geo.plot[1] / 10) * 10).toLocaleString('en-GB') + ' m².';
+      'Ridge ' + (Hr * k).toFixed(1) + ' m. Hall under glass ' + (GL * k).toFixed(0) + ' × ' + (W * k).toFixed(1) + ' m. Main bar ' + (L * k).toFixed(1) + ' m, wing ' + (10 * k).toFixed(0) + ' × ' + (20 * k).toFixed(0) + ' m. Plot ' + (geo.plot[0] * k).toFixed(0) + ' × ' + (geo.plot[1] * k).toFixed(0) + ' m, about ' + (Math.round(pa / 10) * 10).toLocaleString('en-GB') + ' m².';
+    geo.plotArea = pa; updateCost();
   }
+
+  /* ---------- rough cost: Polish prices, Nov 2026, planning level only ---------- */
+  var EURPLN = 4.39;
+  function costModel() {
+    var s2 = SCALE * SCALE;
+    var heated = ((L - 0.9) * (W - 0.9) + 16.05 * (W - 0.9) + 8 + 94) * s2;        // ground + upper + gym/laundry
+    var garage = 106 * s2;
+    var glass = (105 * (P.eave / 6) + 116 + 44.3 * (W / 9.5)) * s2;
+    var extraGlass = Math.max(0, glass - 0.185 * heated);
+    var hk = heated / 486;
+    // each row: quantity x [low, mid, high] rate, PLN
+    var rows = [
+      ['Building, turnkey', [[heated, [6000, 7500, 9500]]]],
+      ['Garage shell', [[garage, [3500, 4500, 5500]]]],
+      ['Glass, timber, fireplace, shading', [[extraGlass, [1500, 2200, 3200]], [150 * s2, [250, 500, 900]], [89 * SCALE, [1900, 2100, 2800]], [350 * s2, [150, 300, 500]], [1, [40000, 70000, 120000]]]],
+      ['Roof balcony, terraces, pergola', [[200 * s2, [700, 1000, 1500]], [265 * s2, [700, 1100, 1700]], [s2, [60000, 100000, 170000]]]],
+      ['Energy: heat pump, PV, ventilation', [[hk, [250000, 380000, 600000]]]],
+      ['Interior upgrades + furniture', [[heated, [400, 1000, 2000]], [hk, [150000, 300000, 600000]]]],
+      ['Pool, sauna, garden, landscaping', [[s2, [250000, 350000, 550000]], [s2, [150000, 280000, 500000]], [s2, [250000, 400000, 700000]]]],
+      ['Site work + utilities', [[s2, [80000, 150000, 300000]], [1, [60000, 120000, 250000]]]]
+    ];
+    var tot = [0, 0, 0], out = [];
+    rows.forEach(function (r) {
+      var v = [0, 0, 0];
+      r[1].forEach(function (c) { for (var i = 0; i < 3; i++) v[i] += c[0] * c[1][i]; });
+      for (var i = 0; i < 3; i++) tot[i] += v[i];
+      out.push([r[0], v[1]]);
+    });
+    var soft = [0.08, 0.10, 0.12], cont = [0.10, 0.12, 0.15], all = [0, 0, 0];
+    for (var i = 0; i < 3; i++) all[i] = tot[i] * (1 + soft[i] + cont[i]);
+    out.push(['Design, permits, contingency', all[1] - tot[1]]);
+    return { rows: out, all: all, heated: heated, garage: garage, glass: glass };
+  }
+  function mpln(v) { return (v / 1e6).toFixed(2); }
+  function updateCost() {
+    var c = costModel(), land = parseFloat(document.getElementById('c-land').value) || 0;
+    document.getElementById('c-total').textContent = '≈ ' + (c.all[1] / 1e6).toFixed(1) + ' M PLN';
+    document.getElementById('c-range').textContent = 'Range ' + (c.all[0] / 1e6).toFixed(1) + '–' + (c.all[2] / 1e6).toFixed(1) + ' M PLN, about ' + (c.all[1] / EURPLN / 1e6).toFixed(1) + ' M EUR, excluding land.';
+    document.getElementById('c-rows').innerHTML = c.rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + mpln(r[1]) + ' M</td></tr>'; }).join('') +
+      '<tr class="sum"><td>Total, likely</td><td>' + mpln(c.all[1]) + ' M</td></tr>';
+    var landCost = (geo.plotArea || 0) * land;
+    document.getElementById('c-landout').textContent = 'Land ' + Math.round(geo.plotArea || 0).toLocaleString('en-GB') + ' m² × ' + land.toLocaleString('en-GB') + ' = ' + mpln(landCost) + ' M PLN; with land about ' + ((c.all[1] + landCost) / 1e6).toFixed(1) + ' M.';
+    document.getElementById('c-note').textContent = 'Heated ' + Math.round(c.heated) + ' m², garage ' + Math.round(c.garage) + ' m², glass ' + Math.round(c.glass) + ' m². Planning figures from Polish price lists, not a quote; about ' + Math.round(c.all[1] / c.heated / 100) * 100 + ' PLN per heated m² all-in.';
+  }
+  document.getElementById('c-land').addEventListener('input', updateCost);
 
   /* ---------- walk mode: first person, Street View style ---------- */
   var EYE = 1.65, STEP = 0.36, RAD = 0.3, aimTick = 0;
+  var WALK_FOV = 55;      // vertical degrees, about 85 across a 16:9 screen; the old 72 was ~104 across and made rooms look small
   var walk = { on: false, x: 0, z: 0, feet: 0, yaw: 0, pitch: 0, keys: {}, target: null, dirty: true, solid: [], floor: [] };
   var wRay = new THREE.Raycaster(), wO = new THREE.Vector3(), wD = new THREE.Vector3(), DOWN = new THREE.Vector3(0, -1, 0), wN = new THREE.Vector2();
   var marker = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.3, 36), new THREE.MeshBasicMaterial({ color: 0x2a55a6, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
@@ -1218,10 +1312,10 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     walk.on = true; tween = null; controls.enabled = false; walk.keys = {}; walk.target = null;
     setToggle('roof', true); setToggle('xray', false);
     walk.dirty = true; walkLists();
-    walk.x = 2.6; walk.z = W + 2.6;                       // on the sunset terrace, facing the glass corner
+    walk.x = 2.6 * SCALE; walk.z = (W + 2.6) * SCALE;                       // on the sunset terrace, facing the glass corner
     var f = floorAt(walk.x, walk.z, 2.5); walk.feet = f === null ? 0 : f;
     walk.yaw = Math.atan2(-0.42, 0.9); walk.pitch = 0.06;
-    camera.fov = 72; camera.near = 0.08; camera.updateProjectionMatrix();
+    camera.fov = WALK_FOV; camera.near = 0.08; camera.updateProjectionMatrix();
     hud.hidden = false; document.body.classList.add('walking'); lamp.visible = true;
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   }
@@ -1280,6 +1374,13 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { b.addEventListener(ev, function () { walk.keys[k] = false; }); });
   });
   document.getElementById('walk-exit').addEventListener('click', function () { goTo('sketch'); });
+  var fovIn = document.getElementById('walk-fov');
+  function setWalkFov(v) {
+    WALK_FOV = Math.max(35, Math.min(85, v)); fovIn.value = WALK_FOV;
+    if (walk.on) { camera.fov = WALK_FOV; camera.updateProjectionMatrix(); }
+  }
+  fovIn.addEventListener('input', function () { setWalkFov(+fovIn.value); });
+  renderer.domElement.addEventListener('wheel', function (e) { if (walk.on) { e.preventDefault(); setWalkFov(WALK_FOV + (e.deltaY > 0 ? 3 : -3)); } }, { passive: false });
 
   // FPS mouse aim: pointer lock, requested only from a click
   var aimNote = document.getElementById('aim-note'), unlockedAt = 0;
@@ -1329,7 +1430,7 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     if (name === 'walk') { enterWalk(); return; }
     if (walk.on) exitWalk();
     var d = viewDef(name); currentView = name;
-    var tgt = new THREE.Vector3().fromArray(d.tgt), pos = new THREE.Vector3().fromArray(d.pos);
+    var tgt = new THREE.Vector3().fromArray(d.tgt).multiplyScalar(SCALE), pos = new THREE.Vector3().fromArray(d.pos).multiplyScalar(SCALE);
     if (d.fit) { var k = Math.max(1, 1.05 / camera.aspect); pos.sub(tgt).multiplyScalar(k).add(tgt); }
     setToggle('roof', d.roof); setToggle('xray', d.xray);
     document.querySelectorAll('button.view').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.view === name ? 'true' : 'false'); });
@@ -1371,6 +1472,16 @@ body.walking.dragging #stage canvas{cursor:grabbing}
     build();
   }
   [sWidth, sEave, sPitch, sFloor].forEach(function (s) { s.addEventListener('input', syncSliders); });
+  var sScale = document.getElementById('s-scale');
+  sScale.addEventListener('input', function () {
+    var old = SCALE; SCALE = parseFloat(sScale.value) / 100;
+    document.getElementById('o-scale').textContent = Math.round(SCALE * 100) + '%';
+    build();
+    if (walk.on) {                                   // keep the walker in the same spot of the house
+      var r = SCALE / old; walk.x *= r; walk.z *= r;
+      var f = floorAt(walk.x, walk.z, walk.feet * r + 2.5); walk.feet = f === null ? walk.feet * r : f; walk.dirty = true;
+    }
+  });
 
   /* ---------- sizing + loop ---------- */
   function resize() {

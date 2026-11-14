@@ -163,7 +163,7 @@ table.areas tr.tot td{border-bottom:0;font-weight:600;color:var(--ink);padding-t
     <div class="masthead">
       <div class="eyebrow">Hoʻokipa · Maui · 20°56′ N</div>
       <h1>Hoʻokipa House</h1>
-      <div class="sub">Draft 13 — the truck gets one bay: a lean-to off the retaining wall, reverse in, nose out.</div>
+      <div class="sub">Draft 13 — the truck gets one bay: a lean-to off the retaining wall, reverse in, nose out — off a round motor court to turn on.</div>
     </div>
 
     <section class="card"><h2>Views</h2><div class="body"><div class="views" id="views"></div></div></section>
@@ -243,14 +243,20 @@ function vols(){
   // half was deck holding nothing up
   const ax1=cxp+aw/2, aWide=Math.max(8, aw*0.66);
   const apron = {x0:ax1-aWide, x1:ax1, z0:slot.z1+1.8, z1:slot.z1+7.8};
-  // arrival: a straight drive onto a small turning apron, and ONE truck bay
-  // cut into the hill at 45° off its south side, so you pull forward past it
-  // and reverse in, and leave nose-first toward the gate
+  // arrival: a straight drive ending in a round motor court, and ONE truck bay
+  // cut into the hill at 45° off its south side, so you sweep round the court
+  // and reverse in, and leave nose-first toward the gate. The court's circle is
+  // centred on the bay's axis, so the bay mouth is tangent to its rim.
   const X=-P.houseW*1.75, zc=-12.4;
   const bay={mx:X+6.0, mz:zc-1.0, ang:-Math.PI/4, w:3.8, d:7.0};   // mouth centre, heading, size
   bay.rx=bay.mx-Math.sin(bay.ang)*bay.d; bay.rz=bay.mz-Math.cos(bay.ang)*bay.d;   // back-wall centre
-  const court = {y:1.5, zc, ax0:X+1, ax1:X+10, az0:zc-1.8, az1:zc+4.4, bay,
-                 x0:X+1, x1:X+12.6, z0:zc-7.6, z1:zc+4.4};          // bounds of the lot
+  // sized to the truck: ~3.3 m wheelbase, 35° lock → its swept ring runs from
+  // about 3.7 m (inner rear wheel) to 7.1 m (outer front corner) off the turning
+  // centre. A 6.8 m court lets it swing the full 180° in one lap round a 2.2 m
+  // island, with the last 0.3 m of outer corner free to ride over the low rim.
+  const CR=6.8, cx=bay.mx+Math.sin(bay.ang)*(CR-0.4), cz=bay.mz+Math.cos(bay.ang)*(CR-0.4);   // the round court, rim 0.4 into the mouth
+  const court = {y:1.5, zc, cx, cz, R:CR, ax0:X+1, ax1:cx+CR, az0:cz-CR, az1:cz+CR, bay,
+                 x0:cx-CR-1, x1:X+12.6, z0:zc-7.6, z1:cz+CR+1};          // bounds of the lot
   return {pav, slot, lower, upper, apron, court};
 }
 // Extend the stair bay far enough to meet the offset upper landing.
@@ -436,7 +442,7 @@ function buildTerrain(){
     // cut the hill away where the plinth sits
     if(x>padX0&&x<padX1&&z>padZ0&&z<padZ1) y=Math.min(y,-0.2);
     const Q=V.court;
-    if(x>Q.ax0-1.5&&x<Q.ax1+1.5&&z>Q.az0-1.5&&z<Q.az1+1.5) y=Math.min(y,Q.y-0.2);
+    if(Math.hypot(x-Q.cx,z-Q.cz)<Q.R+1.5) y=Math.min(y,Q.y-0.2);
     { const b=bayLocal(V,x,z);                       // the bay's cut, stopping at its back wall
       if(Math.abs(b.lx)<Q.bay.w/2+1.6&&b.lz>-0.3&&b.lz<Q.bay.d+1.5) y=Math.min(y,Q.y-0.2); }
     // Cut a continuous approach at drive level, including the west entrance.
@@ -1967,13 +1973,36 @@ function buildArrival(){
   const V=vols(), Q=V.court, B=Q.bay;
   const deep=Q.y+6;
 
-  // ---- the turning apron: drive in, pull forward, reverse into the bay ----
-  const aw=Q.ax1-Q.ax0, ad=Q.az1-Q.az0, acx=(Q.ax0+Q.ax1)/2, acz=(Q.az0+Q.az1)/2;
-  put(G.arrival, box(aw, deep, ad, MAT.stone), acx, Q.y-deep/2, acz);
-  put(G.arrival, box(aw, 0.06, ad, MAT.stoneD), acx, Q.y+0.03, acz, false);
-  for(let y=Q.y-0.45; y>Q.y-5; y-=0.55){
-    put(G.arrival, box(aw+0.04,0.05,0.05,MAT.stoneD), acx, y, Q.az1+0.01, false);
-    put(G.arrival, box(0.05,0.05,ad,MAT.stoneD), Q.ax1+0.01, y, acz, false);
+  // ---- the round motor court: drive in, sweep round, reverse into the bay ----
+  // a 10 m disc on stone fill, a pale stone rim, a ring of paving joints, and a
+  // low gravel-and-planting island in the middle that a truck can overrun
+  {
+    const R=Q.R, cx=Q.cx, cz=Q.cz;
+    const disc=(r,h,m,y,seg)=>{ const c=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,seg||72),m);
+      c.position.set(cx,y,cz); c.castShadow=false; c.receiveShadow=true; G.arrival.add(c); return c; };
+    const flat=(r0,r1,m,y)=>{ const rg=new THREE.Mesh(new THREE.RingGeometry(r0,r1,72),m);
+      rg.rotation.x=-Math.PI/2; rg.position.set(cx,y,cz); rg.receiveShadow=true; G.arrival.add(rg); return rg; };
+    const body=disc(R, deep, MAT.stone, Q.y-deep/2); body.castShadow=true;      // the fill and retaining rim
+    disc(R-0.02, 0.08, MAT.stoneD, Q.y+0.04);                                     // the paved top
+    flat(R-0.42, R-0.02, MAT.stone, Q.y+0.085);                                   // pale stone rim course
+    flat(R*0.62-0.04, R*0.62+0.04, MAT.stone, Q.y+0.085);                         // paving joint ring
+    for(let k=0;k<24;k++){                                                        // radial joints, rim to island
+      const a=k/24*Math.PI*2, r0=2.7, r1=R-0.45;
+      const j=box(0.06, 0.012, r1-r0, MAT.stone);
+      j.position.set(cx+Math.sin(a)*(r0+r1)/2, Q.y+0.087, cz+Math.cos(a)*(r0+r1)/2);
+      j.rotation.y=a; j.receiveShadow=true; G.arrival.add(j);
+    }
+    for(let y=Q.y-0.45; y>Q.y-5; y-=0.55) disc(R+0.012, 0.05, MAT.stoneD, y, 72);   // the cut's coursing, round the rim
+    // the island: gravel bed in a low stone kerb, planted
+    const ir=2.2;
+    disc(ir, 0.12, MAT.stone, Q.y+0.06, 48);
+    disc(ir-0.2, 0.14, MAT.sand||MAT.stoneD, Q.y+0.07, 48);
+    flat(ir-0.04, ir+0.04, MAT.stoneD, Q.y+0.125);
+    [[1.0,0.3,0.7],[-0.8,0.8,0.6],[-0.4,-1.0,0.65],[0.7,-0.8,0.5],[-1.2,-0.3,0.45]].forEach(([dx,dz,s],i)=>{
+      const m=new THREE.Mesh(new THREE.SphereGeometry(s,9,6), i%2?MAT.leaf:MAT.leafD);
+      m.scale.y=0.62; m.position.set(cx+dx, Q.y+0.16+s*0.3, cz+dz); m.castShadow=true; G.arrival.add(m);
+    });
+    G.arrival.add(frangipani(cx-0.1, cz+0.05, 3.6, Q.y+0.14));
   }
 
   // the drive in, from the road to the west, running straight onto the apron
@@ -2095,7 +2124,10 @@ function buildArrival(){
 // where the walk down starts and bends — shared by the model and walk mode
 function pathPts(V){
   const Q=V.court, sx=(V.slot.x0+V.slot.x1)/2;
-  return {p0:{x:Q.ax1+0.4, z:Q.az1-1.2}, pc:{x:sx-5.5, z:Q.az1-0.5}, p1:{x:sx, z:-2.0}};
+  // the walk leaves the court's rim on its north-east side
+  const a=Math.PI/5;
+  return {p0:{x:Q.cx+Math.cos(a)*(Q.R-0.4), z:Q.cz+Math.sin(a)*(Q.R-0.4)},
+          pc:{x:sx-5.5, z:Q.az1-0.5}, p1:{x:sx, z:-2.0}};
 }
 // a point in the bay's own frame (origin on the back wall, +z out of the bay)
 function bayLocal(V,x,z){
@@ -2543,7 +2575,7 @@ function levelAt(x,z){
   walk.upper=false;
   // The drive, apron and bay share one level; follow the stepping path down to the house.
   if(x>=Q.ax0-17&&x<=Q.ax0&&Math.abs(z-Q.zc)<=2.2) return Q.y+0.05;
-  if(x>=Q.ax0&&x<=Q.ax1&&z>=Q.az0&&z<=Q.az1) return Q.y+0.06;
+  if(Math.hypot(x-Q.cx,z-Q.cz)<=Q.R) return Q.y+0.08;
   { const b=bayLocal(V,x,z); if(Math.abs(b.lx)<=Q.bay.w/2&&b.lz>=0&&b.lz<=Q.bay.d) return Q.y+0.06; }
   const PP=pathPts(V), p0=PP.p0, pc=PP.pc, p1=PP.p1;
   for(let i=0;i<=24;i++){
